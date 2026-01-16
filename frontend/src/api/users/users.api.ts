@@ -1,4 +1,5 @@
 import { requestJson } from '../http'
+import { emitAuthChanged } from '../../lib/authEvents'
 import type {
   AuthSession,
   ChangePasswordInput,
@@ -15,23 +16,29 @@ import type {
 
 export const usersApi = {
   // Account creation
-  register(input: CreateUserInput): Promise<AuthSession> {
-    return requestJson<AuthSession>({
+  async register(input: CreateUserInput): Promise<AuthSession> {
+    const session = await requestJson<AuthSession>({
       method: 'POST',
       path: '/api/users/register',
       body: input,
       credentials: 'include',
     })
+
+    emitAuthChanged()
+    return session
   },
 
   // Auth
-  login(input: LoginInput): Promise<AuthSession> {
-    return requestJson<AuthSession>({
+  async login(input: LoginInput): Promise<AuthSession> {
+    const session = await requestJson<AuthSession>({
       method: 'POST',
       path: '/api/users/login',
       body: input,
       credentials: 'include',
     })
+
+    emitAuthChanged()
+    return session
   },
 
   confirmSignUp(input: ConfirmSignUpInput): Promise<StatusResponse> {
@@ -79,12 +86,14 @@ export const usersApi = {
     })
   },
 
-  logout(): Promise<void> {
-    return requestJson<void>({
+  async logout(): Promise<void> {
+    await requestJson<void>({
       method: 'POST',
       path: '/api/users/logout',
       credentials: 'include',
     })
+
+    emitAuthChanged()
   },
 
   me(): Promise<User> {

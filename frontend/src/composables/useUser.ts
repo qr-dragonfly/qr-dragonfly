@@ -1,6 +1,7 @@
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { usersApi } from '../api'
 import type { User } from '../api'
+import { AUTH_CHANGED_EVENT } from '../lib/authEvents'
 
 const currentUser = ref<User | null>(null)
 const isLoading = ref(false)
@@ -31,6 +32,42 @@ export function useUser() {
     void loadCurrentUserOnce()
   })
 
+  // Keep auth state fresh across the app.
+  // - auth-changed: emitted after login/logout and on unexpected 401s
+  // - focus/visibility: refresh when the tab becomes active
+  const lastRefreshAt = ref<number>(0)
+
+  function maybeRefresh(): void {
+    const now = Date.now()
+    if (isLoading.value) return
+    if (!isLoaded.value) return
+    if (now - lastRefreshAt.value < 5_000) return
+    lastRefreshAt.value = now
+    void reloadCurrentUser()
+  }
+
+  function onAuthChanged(): void {
+    maybeRefresh()
+  }
+
+  function onVisibilityChange(): void {
+    if (document.visibilityState === 'visible') maybeRefresh()
+  }
+
+  onMounted(() => {
+    window.addEventListener(AUTH_CHANGED_EVENT, onAuthChanged)
+    window.addEventListener('focus', maybeRefresh)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+  })
+
+  onUnmounted(() => {
+    window.removeEventListener(AUTH_CHANGED_EVENT, onAuthChanged)
+    window.removeEventListener('focus', maybeRefresh)
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+  })
+
+  const isAuthed = computed(() => Boolean(currentUser.value?.email))
+
   const userType = computed<"free" | "basic" | "enterprise" | "admin">(() => {
     const t = currentUser.value?.userType?.toLowerCase()
     if (t === 'basic' || t === 'enterprise' || t === 'admin') return t
@@ -42,6 +79,7 @@ export function useUser() {
     isLoading,
     isLoaded,
     errorMessage,
+    isAuthed,
     userType,
     reload: reloadCurrentUser,
   }

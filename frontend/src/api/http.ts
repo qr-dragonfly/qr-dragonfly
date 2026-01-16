@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './config'
+import { emitAuthChanged } from '../lib/authEvents'
 
 export class ApiError extends Error {
   readonly status: number
@@ -58,6 +59,11 @@ export async function requestJson<T>(options: RequestJsonOptions): Promise<T> {
   const isJson = contentType.includes('application/json')
 
   const payload = isJson ? await response.json().catch(() => null) : await response.text().catch(() => '')
+
+  if (response.status === 401 && options.path !== '/api/users/me') {
+    // If a protected request fails, broadcast auth state change so the app can refresh UI.
+    emitAuthChanged()
+  }
 
   if (!response.ok) {
     const message = `API request failed: ${response.status} ${response.statusText}`

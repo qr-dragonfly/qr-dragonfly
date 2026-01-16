@@ -254,7 +254,7 @@ func isValidHTTPURL(raw string) bool {
 	if err != nil {
 		return false
 	}
-	if u.Scheme != "http" && u.Scheme != "https" {
+	if u.Scheme != "https" {
 		return false
 	}
 	if u.Host == "" {

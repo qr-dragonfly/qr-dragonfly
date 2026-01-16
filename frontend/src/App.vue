@@ -66,15 +66,15 @@ const isAuthRoute = computed(() => {
     <footer class="footer" aria-label="Footer">
       <div class="footerInner">
         <div class="footerLeft">
-          <span class="footerBrand">image-code</span>
-          <span class="footerText">© {{ year }}</span>
+          <span class="footerText">© {{ year }} QR-Dragonfly. Made with care in Minnesota.</span>
         </div>
 
         <nav class="footerNav" aria-label="Footer links">
-          <RouterLink class="footerLink" to="/">QR Codes</RouterLink>
-          <RouterLink v-if="isAuthed" class="footerLink" to="/account">Account</RouterLink>
-          <RouterLink v-if="!isAuthed" class="footerLink" to="/register">Create account</RouterLink>
-          <RouterLink v-if="!isAuthed" class="footerLink" to="/login">Login</RouterLink>
+          <RouterLink class="footerLink" to="/terms">Terms of Service</RouterLink>
+          <span class="footerSep" aria-hidden="true">•</span>
+          <RouterLink class="footerLink" to="/privacy">Privacy Policy</RouterLink>
+          <span class="footerSep" aria-hidden="true">•</span>
+          <RouterLink class="footerLink" to="/cookies">Cookie Policy</RouterLink>
         </nav>
       </div>
     </footer>
@@ -179,13 +179,12 @@ const isAuthRoute = computed(() => {
   gap: 10px;
 }
 
-.footerBrand {
-  font-weight: 700;
-  opacity: 0.95;
-}
-
 .footerText {
   opacity: 0.8;
+}
+
+.footerSep {
+  opacity: 0.5;
 }
 
 .footerNav {

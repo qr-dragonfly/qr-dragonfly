@@ -35,7 +35,16 @@ async function submit() {
   try {
     await usersApi.login({ email: e, password: p })
     await reload()
-    await router.push({ name: 'home' })
+
+    const redirect = route.query.redirect
+    const redirectPath = typeof redirect === 'string' ? redirect : ''
+    const isSafeInternalPath = redirectPath.startsWith('/') && !redirectPath.startsWith('//')
+
+    if (isSafeInternalPath && !redirectPath.startsWith('/login')) {
+      await router.push(redirectPath)
+    } else {
+      await router.push({ name: 'home' })
+    }
   } catch (err) {
     errorMessage.value = authErrorMessage(err)
 

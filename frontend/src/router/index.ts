@@ -9,6 +9,10 @@ import ChangePasswordPage from '../pages/Auth/ChangePasswordPage.vue'
 import ForgotPasswordPage from '../pages/Auth/ForgotPasswordPage.vue'
 import ResetPasswordPage from '../pages/Auth/ResetPasswordPage.vue'
 
+import TermsOfServicePage from '../pages/Legal/TermsOfServicePage.vue'
+import PrivacyPolicyPage from '../pages/Legal/PrivacyPolicyPage.vue'
+import CookiePolicyPage from '../pages/Legal/CookiePolicyPage.vue'
+
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -23,6 +27,10 @@ export const router = createRouter({
 
     { path: '/forgot-password', name: 'forgot-password', component: ForgotPasswordPage },
     { path: '/reset-password', name: 'reset-password', component: ResetPasswordPage },
+
+    { path: '/terms', name: 'terms', component: TermsOfServicePage },
+    { path: '/privacy', name: 'privacy', component: PrivacyPolicyPage },
+    { path: '/cookies', name: 'cookies', component: CookiePolicyPage },
 
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],

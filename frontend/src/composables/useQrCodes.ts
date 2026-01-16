@@ -1,17 +1,61 @@
-import { computed, onMounted, ref } from 'vue'
-import { qrCodesApi } from '../api'
+import { computed, ref, watchEffect } from 'vue'
+import { ApiError, qrCodesApi } from '../api'
 import { useUser } from './useUser'
 import { generateQrDataUrl } from '../lib/qr'
 import { trackingUrlForQrId } from '../lib/tracking'
 import type { QrCodeItem } from '../types/qrCodeItem'
 
-function isValidUrl(value: string): boolean {
-  try {
-    const parsed = new URL(value)
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
-  } catch {
-    return false
+function validateTargetUrl(raw: string): { ok: true; url: string } | { ok: false; message: string } {
+  const value = raw.trim()
+  if (!value) return { ok: false, message: 'Enter a URL.' }
+
+  // Helpful message for common input like "example.com" or "www.example.com".
+  if (!value.includes('://')) {
+    return { ok: false, message: 'URL must start with https:// (example: https://example.com).' }
   }
+
+  let parsed: URL
+  try {
+    parsed = new URL(value)
+  } catch {
+    return { ok: false, message: 'That doesn’t look like a valid URL. Example: https://example.com' }
+  }
+
+  if (parsed.protocol !== 'https:') {
+    return { ok: false, message: 'URL must start with https:// (http is not allowed).' }
+  }
+  if (!parsed.hostname) {
+    return { ok: false, message: 'URL must include a hostname (example: https://example.com).' }
+  }
+
+  return { ok: true, url: parsed.toString() }
+}
+
+function qrCodesErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    const payload = err.payload as any
+    const code = payload?.error
+    if (typeof code === 'string' && code.trim()) {
+      switch (code) {
+        case 'url_required':
+          return 'Enter a URL.'
+        case 'url_invalid':
+          return 'URL must be a valid https URL (example: https://example.com).'
+        case 'quota_total_exceeded':
+          return 'You’ve reached your QR code limit for your plan.'
+        case 'quota_active_exceeded':
+          return 'You’ve reached your active QR code limit for your plan.'
+        case 'not_found':
+          return 'That QR code no longer exists.'
+        default:
+          return code
+      }
+    }
+    if (err.status === 401) return 'Please log in again.'
+    return `${err.status} ${err.message}`
+  }
+  if (err instanceof Error) return err.message
+  return 'Request failed.'
 }
 
 export function useQrCodes() {
@@ -26,7 +70,7 @@ export function useQrCodes() {
 
   const hasQrCodes = computed(() => qrCodes.value.length > 0)
 
-  const { userType } = useUser()
+  const { userType, isAuthed } = useUser()
 
   async function hydrateQrDataUrls(items: { id: string; url: string }[]): Promise<Record<string, string>> {
     const out: Record<string, string> = {}
@@ -43,6 +87,13 @@ export function useQrCodes() {
   }
 
   async function loadQrCodes(): Promise<void> {
+    if (!isAuthed.value) {
+      qrCodes.value = []
+      errorMessage.value = null
+      isLoading.value = false
+      return
+    }
+
     errorMessage.value = null
     isLoading.value = true
     try {
@@ -63,25 +114,29 @@ export function useQrCodes() {
     }
   }
 
-  onMounted(() => {
+  watchEffect(() => {
+    if (!isAuthed.value) {
+      qrCodes.value = []
+      return
+    }
     void loadQrCodes()
   })
 
   async function createQrCode(): Promise<void> {
+    if (!isAuthed.value) {
+      errorMessage.value = 'Please log in to create QR codes.'
+      return
+    }
+
     errorMessage.value = null
 
     const label = labelInput.value.trim() || 'Untitled'
-    const url = urlInput.value.trim()
-
-    if (!url) {
-      errorMessage.value = 'Enter a URL.'
+    const validation = validateTargetUrl(urlInput.value)
+    if (!validation.ok) {
+      errorMessage.value = validation.message
       return
     }
-
-    if (!isValidUrl(url)) {
-      errorMessage.value = 'Enter a valid http(s) URL (include https://).'
-      return
-    }
+    const url = validation.url
 
     isCreating.value = true
     try {
@@ -99,47 +154,37 @@ export function useQrCodes() {
       qrCodes.value = [item, ...qrCodes.value.filter((q) => q.id !== item.id)]
       labelInput.value = ''
       urlInput.value = ''
-    } catch {
-      errorMessage.value = 'Failed to create QR code.'
+    } catch (err) {
+      errorMessage.value = qrCodesErrorMessage(err)
     } finally {
       isCreating.value = false
     }
   }
 
   async function deleteQrCode(id: string): Promise<void> {
+    if (!isAuthed.value) return
     errorMessage.value = null
     try {
       await qrCodesApi.delete(id, userType.value)
       qrCodes.value = qrCodes.value.filter((q) => q.id !== id)
-    } catch {
-      errorMessage.value = 'Failed to delete QR code.'
+    } catch (err) {
+      errorMessage.value = qrCodesErrorMessage(err)
     }
   }
 
-  async function updateQrCode(id: string, input: { label: string; url: string }): Promise<void> {
+  async function updateQrCode(id: string, input: { label: string }): Promise<void> {
+    if (!isAuthed.value) return
     errorMessage.value = null
-
     const label = input.label.trim()
-    const url = input.url.trim()
-
-    if (!url) {
-      errorMessage.value = 'Enter a URL.'
-      return
-    }
-    if (!isValidUrl(url)) {
-      errorMessage.value = 'Enter a valid http(s) URL (include https://).'
-      return
-    }
 
     const current = qrCodes.value.find((q) => q.id === id)
     if (!current) return
 
-    const patch: { label?: string; url?: string } = {}
+    const patch: { label?: string } = {}
     if (label !== current.label) patch.label = label
-    if (url !== current.url) patch.url = url
 
     // No-op
-    if (!patch.label && !patch.url) return
+    if (!patch.label) return
 
     updatingId.value = id
     try {
@@ -151,21 +196,22 @@ export function useQrCodes() {
           ? {
               ...q,
               label: updated.label,
-              url: updated.url,
+              url: q.url,
               active: updated.active,
               createdAtIso: updated.createdAtIso,
               qrDataUrl: nextQrDataUrl,
             }
           : q,
       )
-    } catch {
-      errorMessage.value = 'Failed to update QR code.'
+    } catch (err) {
+      errorMessage.value = qrCodesErrorMessage(err)
     } finally {
       updatingId.value = null
     }
   }
 
   async function setQrCodeActive(id: string, active: boolean): Promise<void> {
+    if (!isAuthed.value) return
     errorMessage.value = null
 
     const current = qrCodes.value.find((q) => q.id === id)
@@ -176,8 +222,8 @@ export function useQrCodes() {
     try {
       const updated = await qrCodesApi.update(id, { active }, userType.value)
       qrCodes.value = qrCodes.value.map((q) => (q.id === id ? { ...q, active: updated.active } : q))
-    } catch {
-      errorMessage.value = 'Failed to update QR code.'
+    } catch (err) {
+      errorMessage.value = qrCodesErrorMessage(err)
     } finally {
       updatingId.value = null
     }
