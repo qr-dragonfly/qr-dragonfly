@@ -43,7 +43,7 @@ func (c *Client) CreateCheckoutSession(customerEmail string, priceID string) (*s
 		SuccessURL: stripe.String(c.cfg.SuccessURL),
 		CancelURL:  stripe.String(c.cfg.CancelURL),
 	}
-	checkoutsession.New(params)
+	sess, err := checkoutsession.New(params)
 	if err != nil {
 		return nil, fmt.Errorf("stripe session creation failed: %w", err)
 	}
@@ -66,7 +66,6 @@ func (c *Client) CreateCustomerPortalSession(customerEmail string) (*stripe.Bill
 
 	portalSession, err := session.New(params)
 	if err != nil {
-		billingportal
 		return nil, fmt.Errorf("stripe portal session creation failed: %w", err)
 	}
 

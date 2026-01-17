@@ -1,23 +1,10 @@
 <script setup lang="ts">
-import { watchEffect } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import { useQrCodes } from '../../composables/useQrCodes'
 import { useUser } from '../../composables/useUser'
 import CreateQrCodeForm from '../../components/CreateQrCodeForm/CreateQrCodeForm.vue'
 import QrCodesTable from '../../components/QrCodesTable/QrCodesTable.vue'
 
-const router = useRouter()
-const route = useRoute()
-
-const { isAuthed, isLoaded } = useUser()
-
-watchEffect(() => {
-  if (!isLoaded.value) return
-  if (isAuthed.value) return
-
-  const redirect = route.fullPath || '/'
-  void router.replace({ name: 'login', query: { redirect } })
-})
+const { isAuthed } = useUser()
 
 const {
   qrCodes,
@@ -42,6 +29,14 @@ const {
       <p class="subtitle">Create QR codes for user-inputted URLs.</p>
     </header>
 
+    <section v-if="!isAuthed" class="authPrompt">
+      <p class="muted">Sign in to create and manage your own QR codes.</p>
+      <div class="actions">
+        <RouterLink class="button" to="/login">Login</RouterLink>
+        <RouterLink class="button secondary" to="/register">Create account</RouterLink>
+      </div>
+    </section>
+
     <CreateQrCodeForm
       v-if="isAuthed"
       v-model:label="labelInput"
@@ -52,10 +47,10 @@ const {
     />
 
     <QrCodesTable
-      v-if="isAuthed"
       :qrCodes="qrCodes"
       :updatingId="updatingId"
       :errorMessage="errorMessage"
+      :showSampleWhenEmpty="!isAuthed"
       @copy-url="copyToClipboard"
       @download="downloadQrCode"
       @remove="deleteQrCode"

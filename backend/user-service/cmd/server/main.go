@@ -55,7 +55,9 @@ func main() {
 			WebhookSecret:     stripeWebhookSecret,
 			BasicPriceID:      stripeBasicPriceID,
 			EnterprisePriceID: stripeEnterprisePriceID,
-			SuccessURL:        stripeSuccessURL			PortalReturnURL:     stripePortalReturnURL,			CancelURL:         stripeCancelURL,
+			SuccessURL:        stripeSuccessURL,
+			PortalReturnURL:   stripePortalReturnURL,
+			CancelURL:         stripeCancelURL,
 		})
 		log.Printf("stripe configured with basic price: %s, enterprise price: %s", stripeBasicPriceID, stripeEnterprisePriceID)
 	} else {
