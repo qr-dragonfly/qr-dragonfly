@@ -91,7 +91,7 @@ const isAuthRoute = computed(() => {
 
 .header {
   border-bottom: 1px solid color-mix(in srgb, $color-fg 12%, transparent);
-  background: color-mix(in srgb, $color-surface 70%, transparent);
+  background: $color-nav-bg;
 }
 
 .content {
@@ -161,7 +161,7 @@ const isAuthRoute = computed(() => {
 .footer {
   padding: 18px 16px 28px;
   border-top: 1px solid color-mix(in srgb, $color-fg 12%, transparent);
-  background: color-mix(in srgb, $color-bg 85%, transparent);
+  background: $color-footer-bg;
 }
 
 .footerInner {
@@ -204,10 +204,64 @@ const isAuthRoute = computed(() => {
   opacity: 1;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+  .nav {
+    justify-content: center;
+    padding: 12px 12px;
+  }
+
   .spacer {
+    display: none;
+  }
+
+  .brand {
     flex-basis: 100%;
-    height: 0;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  .navUser {
+    flex-basis: 100%;
+    text-align: center;
+    max-width: 100%;
+    order: -1;
+    margin-bottom: 4px;
+    font-size: $font-size-sm;
+  }
+
+  .navLink {
+    padding: 8px 12px;
+    font-size: $font-size-sm;
+  }
+
+  .footer {
+    padding: 16px 12px 24px;
+  }
+
+  .footerInner {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .footerLeft {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .footerText {
+    font-size: $font-size-xs;
+  }
+
+  .footerNav {
+    width: 100%;
+    justify-content: center;
+    font-size: $font-size-xs;
+    gap: 8px;
+  }
+
+  .footerLink {
+    padding: 4px 8px;
   }
 }
 </style>

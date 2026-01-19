@@ -6,10 +6,56 @@
   /* Theme primitives (re-using existing palette). */
   --color-bg: #242424;
   --color-fg: rgba(255, 255, 255, 0.87);
+  --color-fg-muted: rgba(255, 255, 255, 0.6);
   --color-link: #646cff;
   --color-link-hover: #535bf2;
   --color-surface: #1a1a1a;
+  
+  /* Navbar and Footer colors */
+  --color-nav-bg: #1a1625;
+  --color-footer-bg: #151320;
+  
+  /* Status colors */
+  --color-success: #10b981;
+  --color-success-bg: rgba(16, 185, 129, 0.1);
+  --color-error: #ef4444;
+  --color-error-bg: rgba(239, 68, 68, 0.1);
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-info: #3b82f6;
+  --color-info-bg: rgba(59, 130, 246, 0.1);
+  
+  /* Border colors */
+  --border-color: rgba(255, 255, 255, 0.12);
+  --border-color-hover: rgba(255, 255, 255, 0.24);
+  --border-color-light: rgba(255, 255, 255, 0.08);
+  
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  
+  /* Border radius */
+  --radius-sm: 6px;
   --radius-md: 8px;
+  --radius-lg: 12px;
+  
+  /* Typography */
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-base: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 28px;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 
   color-scheme: light dark;
   color: var(--color-fg);
@@ -68,9 +114,29 @@ button:focus-visible {
     /* Light theme primitives (re-using existing palette). */
     --color-bg: #ffffff;
     --color-fg: #213547;
+    --color-fg-muted: rgba(33, 53, 71, 0.6);
     --color-link: #646cff;
     --color-link-hover: #747bff;
     --color-surface: #f9f9f9;
+    
+    /* Navbar and Footer colors for light theme */
+    --color-nav-bg: #f5f3ff;
+    --color-footer-bg: #ebe8ff;
+    
+    /* Status colors (same for both themes) */
+    --color-success: #10b981;
+    --color-success-bg: rgba(16, 185, 129, 0.1);
+    --color-error: #ef4444;
+    --color-error-bg: rgba(239, 68, 68, 0.1);
+    --color-warning: #f59e0b;
+    --color-warning-bg: rgba(245, 158, 11, 0.1);
+    --color-info: #3b82f6;
+    --color-info-bg: rgba(59, 130, 246, 0.1);
+    
+    /* Border colors for light theme */
+    --border-color: rgba(0, 0, 0, 0.12);
+    --border-color-hover: rgba(0, 0, 0, 0.24);
+    --border-color-light: rgba(0, 0, 0, 0.06);
 
     color: var(--color-fg);
     background-color: var(--color-bg);
