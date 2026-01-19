@@ -166,17 +166,14 @@ func (srv *Server) handleCheckoutCompleted(event stripe.Event) {
 	}
 
 	// Determine subscription tier from line items
-	userType := "basic" // default
-	if session.Subscription != nil {
-		sub := session.Subscription
-		if sub.Items != nil && len(sub.Items.Data) > 0 {
-			// You can check price ID to determine tier
-			// For now, we'll need metadata or price ID mapping
-		}
+	entitlement := "free" // default
+	if len(session.LineItems.Data) > 0 {
+		priceID := session.LineItems.Data[0].Price.ID
+		entitlement = srv.getEntitlementFromPriceID(priceID)
 	}
 
-	log.Printf("checkout completed for %s, updating to %s", customerEmail, userType)
-	srv.updateUserTypeByEmail(context.Background(), customerEmail, userType)
+	log.Printf("checkout completed for %s, updating entitlement to %s", customerEmail, entitlement)
+	srv.updateUserEntitlementByEmail(context.Background(), customerEmail, entitlement)
 }
 
 func (srv *Server) handleSubscriptionUpdated(event stripe.Event) {
@@ -188,16 +185,34 @@ func (srv *Server) handleSubscriptionUpdated(event stripe.Event) {
 
 	if subscription.Status != stripe.SubscriptionStatusActive {
 		log.Printf("subscription %s not active, status: %s", subscription.ID, subscription.Status)
+		// If canceled or past_due, downgrade to free
+		if subscription.Status == stripe.SubscriptionStatusCanceled ||
+			subscription.Status == stripe.SubscriptionStatusIncomplete ||
+			subscription.Status == stripe.SubscriptionStatusIncompleteExpired {
+			if customerEmail := srv.getCustomerEmail(&subscription); customerEmail != "" {
+				log.Printf("subscription %s inactive, downgrading customer to free", subscription.ID)
+				srv.updateUserEntitlementByEmail(context.Background(), customerEmail, "free")
+			}
+		}
 		return
 	}
 
 	// Get customer email
-	if subscription.Customer == nil {
+	customerEmail := srv.getCustomerEmail(&subscription)
+	if customerEmail == "" {
+		log.Printf("could not determine customer email for subscription %s", subscription.ID)
 		return
 	}
 
-	// Note: In production, you'd fetch customer details or store mapping
-	log.Printf("subscription %s updated, customer: %v", subscription.ID, subscription.Customer)
+	// Determine entitlement from subscription items
+	entitlement := "free"
+	if subscription.Items != nil && len(subscription.Items.Data) > 0 {
+		priceID := subscription.Items.Data[0].Price.ID
+		entitlement = srv.getEntitlementFromPriceID(priceID)
+	}
+
+	log.Printf("subscription %s updated for %s, setting entitlement to %s", subscription.ID, customerEmail, entitlement)
+	srv.updateUserEntitlementByEmail(context.Background(), customerEmail, entitlement)
 }
 
 func (srv *Server) handleSubscriptionDeleted(event stripe.Event) {
@@ -208,10 +223,17 @@ func (srv *Server) handleSubscriptionDeleted(event stripe.Event) {
 	}
 
 	// Downgrade user to free tier
-	log.Printf("subscription %s deleted, customer should be downgraded", subscription.ID)
+	customerEmail := srv.getCustomerEmail(&subscription)
+	if customerEmail == "" {
+		log.Printf("could not determine customer email for deleted subscription %s", subscription.ID)
+		return
+	}
+
+	log.Printf("subscription %s deleted, downgrading %s to free", subscription.ID, customerEmail)
+	srv.updateUserEntitlementByEmail(context.Background(), customerEmail, "free")
 }
 
-func (srv *Server) updateUserTypeByEmail(ctx context.Context, email, userType string) {
+func (srv *Server) updateUserEntitlementByEmail(ctx context.Context, email, entitlement string) {
 	// List users to find by email
 	listOut, err := srv.Cognito.ListUsers(ctx, &cognitoidentityprovider.ListUsersInput{
 		UserPoolId: aws.String(srv.UserPoolID),
@@ -225,17 +247,57 @@ func (srv *Server) updateUserTypeByEmail(ctx context.Context, email, userType st
 
 	username := aws.ToString(listOut.Users[0].Username)
 
+	// Update both user_type (for backward compatibility) and entitlements
 	_, err = srv.Cognito.AdminUpdateUserAttributes(ctx, &cognitoidentityprovider.AdminUpdateUserAttributesInput{
 		UserPoolId: aws.String(srv.UserPoolID),
 		Username:   aws.String(username),
 		UserAttributes: []cognitoTypes.AttributeType{
-			{Name: aws.String(cognitoUserTypeAttr), Value: aws.String(userType)},
+			{Name: aws.String(cognitoUserTypeAttr), Value: aws.String(entitlement)},
+			{Name: aws.String(cognitoEntitlementsAttr), Value: aws.String(entitlement)},
 		},
 	})
 	if err != nil {
-		log.Printf("failed to update user type for %s: %v", email, err)
+		log.Printf("failed to update entitlement for %s: %v", email, err)
 		return
 	}
 
-	log.Printf("updated user %s to type %s", email, userType)
+	log.Printf("updated user %s to entitlement %s", email, entitlement)
+}
+
+// getEntitlementFromPriceID maps Stripe price ID to entitlement tier
+func (srv *Server) getEntitlementFromPriceID(priceID string) string {
+	if srv.StripeClient == nil {
+		return "free"
+	}
+
+	plan, err := srv.StripeClient.GetPriceIDForPlan("basic")
+	if err == nil && plan == priceID {
+		return "basic"
+	}
+
+	plan, err = srv.StripeClient.GetPriceIDForPlan("enterprise")
+	if err == nil && plan == priceID {
+		return "enterprise"
+	}
+
+	return "free"
+}
+
+// getCustomerEmail retrieves customer email from a subscription
+func (srv *Server) getCustomerEmail(subscription *stripe.Subscription) string {
+	if subscription.Customer == nil {
+		return ""
+	}
+
+	// If customer is expanded, get email directly
+	if subscription.Customer.Email != "" {
+		return subscription.Customer.Email
+	}
+
+	// Customer metadata might have email
+	if email, ok := subscription.Metadata["customer_email"]; ok {
+		return email
+	}
+
+	return ""
 }

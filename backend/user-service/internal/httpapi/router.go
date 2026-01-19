@@ -89,9 +89,39 @@ type Server struct {
 }
 
 const cognitoUserTypeAttr = "custom:user_type"
+const cognitoEntitlementsAttr = "custom:entitlements"
 
 func normalizeUserType(value string) string {
 	return strings.TrimSpace(strings.ToLower(value))
+}
+
+// mapUserTypeToEntitlement maps legacy user_type to entitlements format
+func mapUserTypeToEntitlement(userType string) string {
+	userType = normalizeUserType(userType)
+	switch userType {
+	case "free":
+		return "free"
+	case "basic":
+		return "basic"
+	case "enterprise":
+		return "enterprise"
+	case "admin":
+		return "admin"
+	default:
+		return "free"
+	}
+}
+
+// mapSubscriptionToEntitlement determines entitlement from Stripe subscription
+func mapSubscriptionToEntitlement(priceID, basicPriceID, enterprisePriceID string) string {
+	switch priceID {
+	case basicPriceID:
+		return "basic"
+	case enterprisePriceID:
+		return "enterprise"
+	default:
+		return "free"
+	}
 }
 
 func derivedUsernameFromEmail(email string) string {
