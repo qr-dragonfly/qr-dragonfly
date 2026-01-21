@@ -42,7 +42,10 @@ const isAuthRoute = computed(() => {
   <div class="shell">
     <header class="header">
       <nav class="nav" aria-label="Primary">
-        <RouterLink class="navLink brand" to="/">QR Codes</RouterLink>
+        <RouterLink class="navLink brand" to="/">
+          <img src="/dragonfly-tmp.png" alt="QR-Dragonfly" class="logo" />
+          <span>QR-Dragonfly</span>
+        </RouterLink>
 
         <div class="spacer" />
 
@@ -116,12 +119,19 @@ const isAuthRoute = computed(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   padding: 6px 10px;
   border-radius: $radius-md;
   border: 1px solid color-mix(in srgb, $color-fg 12%, transparent);
   text-decoration: none;
   opacity: 0.95;
   background: color-mix(in srgb, $color-bg 30%, transparent);
+}
+
+.logo {
+  width: 24px;
+  height: 24px;
+  display: block;
 }
 
 .navButton {
