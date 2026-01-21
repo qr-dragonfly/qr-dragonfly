@@ -11,8 +11,9 @@ import (
 )
 
 type MemoryStore struct {
-	mu   sync.RWMutex
-	byID map[string]model.QrCode
+	mu       sync.RWMutex
+	byID     map[string]model.QrCode
+	settings model.UserSettings
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -123,4 +124,17 @@ func (s *MemoryStore) CountActive() (int, error) {
 		}
 	}
 	return active, nil
+}
+
+func (s *MemoryStore) GetSettings() (model.UserSettings, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.settings, nil
+}
+
+func (s *MemoryStore) UpdateSettings(settings model.UserSettings) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.settings = settings
+	return nil
 }

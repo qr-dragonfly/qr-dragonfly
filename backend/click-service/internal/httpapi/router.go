@@ -18,6 +18,7 @@ type Server struct {
 	Store    store.Store
 	QrClient interface {
 		GetQrCode(ctx context.Context, id string) (qrclient.QrCode, error)
+		GetSettings(ctx context.Context) (qrclient.Settings, error)
 	}
 }
 
@@ -62,12 +63,26 @@ func NewRouter(srv Server) http.Handler {
 			w.WriteHeader(http.StatusBadGateway)
 			return
 		}
-		if !qr.Active || strings.TrimSpace(qr.URL) == "" {
+
+		// If inactive, check for global default redirect URL
+		if !qr.Active {
+			settings, err := srv.QrClient.GetSettings(ctx)
+			if err == nil && strings.TrimSpace(settings.DefaultRedirectURL) != "" {
+				// Redirect to global default URL without recording click
+				w.Header().Set("Cache-Control", "no-store")
+				http.Redirect(w, r, strings.TrimSpace(settings.DefaultRedirectURL), http.StatusFound)
+				return
+			}
+			// No default URL, return 404
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
 
 		targetURL := strings.TrimSpace(qr.URL)
+		if targetURL == "" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 
 		// Build the click event now, but record it asynchronously so the redirect is as fast as possible.
 		event := store.ClickEvent{

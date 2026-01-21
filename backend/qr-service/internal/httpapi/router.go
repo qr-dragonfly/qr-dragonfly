@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"qr-service/internal/middleware"
+	"qr-service/internal/model"
 	"qr-service/internal/store"
 )
 
@@ -232,6 +233,34 @@ func NewRouter(srv Server) http.Handler {
 		}
 	})
 
+	settingsHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			settings, err := srv.Store.GetSettings()
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed_to_get_settings"})
+				return
+			}
+			writeJSON(w, http.StatusOK, settings)
+			return
+		case http.MethodPut:
+			var req model.UserSettings
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+				return
+			}
+			if err := srv.Store.UpdateSettings(req); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed_to_update_settings"})
+				return
+			}
+			writeJSON(w, http.StatusOK, req)
+			return
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+	})
+
 	wrap := func(h http.Handler) http.Handler {
 		return middleware.Recoverer(middleware.RequestID(middleware.ExposeResponseHeaders(middleware.EnforceJSONHandler(h))))
 	}
@@ -239,6 +268,7 @@ func NewRouter(srv Server) http.Handler {
 	mux.Handle("/healthz", wrap(healthHandler))
 	mux.Handle("/api/qr-codes", wrap(collectionHandler))
 	mux.Handle("/api/qr-codes/", wrap(itemHandler))
+	mux.Handle("/api/settings", wrap(settingsHandler))
 
 	return mux
 }

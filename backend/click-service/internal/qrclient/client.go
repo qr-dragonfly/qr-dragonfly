@@ -18,6 +18,10 @@ type QrCode struct {
 	Active bool   `json:"active"`
 }
 
+type Settings struct {
+	DefaultRedirectURL string `json:"defaultRedirectUrl"`
+}
+
 type Client struct {
 	BaseURL string
 	HTTP    *http.Client
@@ -60,6 +64,29 @@ func (c *Client) GetQrCode(ctx context.Context, id string) (QrCode, error) {
 	var out QrCode
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return QrCode{}, err
+	}
+	return out, nil
+}
+
+func (c *Client) GetSettings(ctx context.Context) (Settings, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/api/settings", c.BaseURL), nil)
+	if err != nil {
+		return Settings{}, err
+	}
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return Settings{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return Settings{}, fmt.Errorf("qr-service unexpected status: %d", resp.StatusCode)
+	}
+
+	var out Settings
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return Settings{}, err
 	}
 	return out, nil
 }

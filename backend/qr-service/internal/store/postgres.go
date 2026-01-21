@@ -26,6 +26,13 @@ type qrCodeRow struct {
 
 func (qrCodeRow) TableName() string { return "qr_codes" }
 
+type settingsRow struct {
+	ID                 int    `gorm:"primaryKey;autoIncrement"`
+	DefaultRedirectURL string `gorm:"default:''"`
+}
+
+func (settingsRow) TableName() string { return "user_settings" }
+
 func NewPostgresStore(ctx context.Context, databaseURL string) (*PostgresStore, error) {
 	gdb, err := gorm.Open(postgres.Open(databaseURL), &gorm.Config{})
 	if err != nil {
@@ -87,7 +94,10 @@ func (s *PostgresStore) ensureSchema(ctx context.Context) error {
 		}
 	}
 
-	return db.AutoMigrate(&qrCodeRow{})
+	if err := db.AutoMigrate(&qrCodeRow{}); err != nil {
+		return err
+	}
+	return db.AutoMigrate(&settingsRow{})
 }
 
 func (s *PostgresStore) List() []model.QrCode {
@@ -207,4 +217,17 @@ func (s *PostgresStore) CountActive() (int, error) {
 		return 0, err
 	}
 	return int(n), nil
+}
+
+func (s *PostgresStore) GetSettings() (model.UserSettings, error) {
+	var row settingsRow
+	err := s.db.FirstOrCreate(&row, settingsRow{ID: 1}).Error
+	if err != nil {
+		return model.UserSettings{}, err
+	}
+	return model.UserSettings{DefaultRedirectURL: row.DefaultRedirectURL}, nil
+}
+
+func (s *PostgresStore) UpdateSettings(settings model.UserSettings) error {
+	return s.db.Model(&settingsRow{}).Where("id = ?", 1).Update("default_redirect_url", settings.DefaultRedirectURL).Error
 }

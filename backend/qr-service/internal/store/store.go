@@ -17,6 +17,10 @@ type Store interface {
 
 	CountTotal() (int, error)
 	CountActive() (int, error)
+
+	// Settings
+	GetSettings() (model.UserSettings, error)
+	UpdateSettings(settings model.UserSettings) error
 }
 
 type CreateInput struct {

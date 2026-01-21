@@ -44,6 +44,10 @@ func (q *qrClientSpy) GetQrCode(_ context.Context, id string) (qrclient.QrCode, 
 	return q.resp, q.err
 }
 
+func (q *qrClientSpy) GetSettings(_ context.Context) (qrclient.Settings, error) {
+	return qrclient.Settings{}, nil
+}
+
 func TestRedirect_UsesDbUrlAndChecksActive(t *testing.T) {
 	spy := &storeSpy{ch: make(chan store.ClickEvent, 1)}
 	qrSpy := &qrClientSpy{resp: qrclient.QrCode{ID: "abc123", URL: "https://example.com/db", Active: true}}
