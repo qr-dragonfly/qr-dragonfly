@@ -87,6 +87,29 @@ func (s *MemoryStore) GetDaily(qrCodeID string, day time.Time) (DailyClickStats,
 	return *ds, nil
 }
 
+func (s *MemoryStore) GetDailyBatch(qrCodeID string, days []time.Time) (map[string]DailyClickStats, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	byDay, ok := s.daily[qrCodeID]
+	if !ok {
+		return map[string]DailyClickStats{}, nil
+	}
+
+	result := make(map[string]DailyClickStats)
+	for _, day := range days {
+		day = day.UTC()
+		day = time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+		key := day.Format("2006-01-02")
+
+		if ds, ok := byDay[key]; ok {
+			result[key] = *ds
+		}
+	}
+
+	return result, nil
+}
+
 func incrementHour(ds *DailyClickStats, hour int) {
 	switch hour {
 	case 0:

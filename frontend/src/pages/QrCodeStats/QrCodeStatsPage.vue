@@ -41,15 +41,15 @@ function dateIsoUTC(daysAgo: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-async function fetchDailyClicks(qrId: string, dayIso: string): Promise<DailyClicks | null> {
+async function fetchDailyClicksBatch(qrId: string, dayIsos: string[]): Promise<Record<string, DailyClicks>> {
   try {
-    return await requestJson<DailyClicks>({
+    return await requestJson<Record<string, DailyClicks>>({
       method: 'GET',
-      path: `/api/clicks/${encodeURIComponent(qrId)}/daily`,
-      query: { day: dayIso },
+      path: '/api/clicks/daily-batch',
+      query: { qrId, days: dayIsos.join(',') },
     })
   } catch {
-    return null
+    return {}
   }
 }
 
@@ -154,6 +154,7 @@ const displayHourlyRows = computed(() => (isFreeUser.value ? sampleHourlyRows : 
 watchEffect(() => {
   if (!isAuthed.value) return
   if (!id.value) return
+  if (isLoading.value) return // Prevent duplicate requests
 
   errorMessage.value = null
   isLoading.value = true
@@ -162,11 +163,11 @@ watchEffect(() => {
       const item = await qrCodesApi.getById(id.value, userType.value)
       qrCode.value = { id: item.id, label: item.label, url: item.url, active: item.active }
 
-      // Fetch daily click buckets for the last 7 days.
-      const results = await Promise.all(last7Days.value.map((dayIso) => fetchDailyClicks(id.value, dayIso)))
+      // Fetch daily click buckets for the last 7 days using batch endpoint.
+      const batchResult = await fetchDailyClicksBatch(id.value, last7Days.value)
       const next: Record<string, DailyClicks | null> = {}
-      last7Days.value.forEach((dayIso, idx) => {
-        next[dayIso] = results[idx] ?? null
+      last7Days.value.forEach((dayIso) => {
+        next[dayIso] = batchResult[dayIso] ?? null
       })
       dailyByDay.value = next
 

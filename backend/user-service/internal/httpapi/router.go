@@ -946,6 +946,8 @@ func mapUser(username *string, attrs []types.AttributeType, createdAt *time.Time
 			u.Email = aws.ToString(a.Value)
 		case cognitoUserTypeAttr:
 			u.UserType = aws.ToString(a.Value)
+		case cognitoEntitlementsAttr:
+			u.Entitlements = aws.ToString(a.Value)
 		}
 	}
 	u.CreatedAt = timeOrZero(createdAt)
@@ -974,6 +976,8 @@ func getUserFromAccessToken(ctx context.Context, api cognito.API, accessToken st
 			user.Email = aws.ToString(a.Value)
 		case cognitoUserTypeAttr:
 			user.UserType = aws.ToString(a.Value)
+		case cognitoEntitlementsAttr:
+			user.Entitlements = aws.ToString(a.Value)
 		}
 	}
 	return user, nil

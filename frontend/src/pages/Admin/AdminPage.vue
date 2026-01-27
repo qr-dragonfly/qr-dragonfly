@@ -5,12 +5,12 @@ import { adminApi, type AdminUser } from '../../api'
 import { useUser } from '../../composables/useUser'
 
 const router = useRouter()
-const { isAuthed, isLoaded, userType } = useUser()
+const { isAuthed, isLoaded, isAdmin } = useUser()
 
 // Redirect non-admin users
 watchEffect(() => {
   if (!isLoaded.value) return
-  if (!isAuthed.value || userType.value !== 'admin') {
+  if (!isAuthed.value || !isAdmin.value) {
     void router.replace({ name: 'home' })
   }
 })

@@ -63,4 +63,5 @@ type Store interface {
 	RecordClick(event ClickEvent) error
 	GetStats(qrCodeID string) (ClickStats, error)
 	GetDaily(qrCodeID string, day time.Time) (DailyClickStats, error)
+	GetDailyBatch(qrCodeID string, days []time.Time) (map[string]DailyClickStats, error)
 }

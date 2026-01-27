@@ -197,3 +197,66 @@ func (s *PostgresStore) GetDaily(qrCodeID string, day time.Time) (DailyClickStat
 		Hour23:       row.Hour23,
 	}, nil
 }
+
+func (s *PostgresStore) GetDailyBatch(qrCodeID string, days []time.Time) (map[string]DailyClickStats, error) {
+	if len(days) == 0 {
+		return map[string]DailyClickStats{}, nil
+	}
+
+	// Normalize days to UTC date boundaries
+	normalizedDays := make([]time.Time, len(days))
+	for i, day := range days {
+		normalizedDays[i] = time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+	}
+
+	var rows []clickDailyStatsRow
+	err := s.db.Where("qr_code_id = ? AND day IN ?", qrCodeID, normalizedDays).Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]DailyClickStats)
+	for _, row := range rows {
+		var regionCounts map[string]int
+		if len(row.RegionCounts) > 0 {
+			_ = json.Unmarshal(row.RegionCounts, &regionCounts)
+			if len(regionCounts) == 0 {
+				regionCounts = nil
+			}
+		}
+
+		dayIso := row.Day.UTC().Format("2006-01-02")
+		result[dayIso] = DailyClickStats{
+			QrCodeID:     qrCodeID,
+			DayIso:       dayIso,
+			Total:        row.Total,
+			RegionCounts: regionCounts,
+			Hour00:       row.Hour00,
+			Hour01:       row.Hour01,
+			Hour02:       row.Hour02,
+			Hour03:       row.Hour03,
+			Hour04:       row.Hour04,
+			Hour05:       row.Hour05,
+			Hour06:       row.Hour06,
+			Hour07:       row.Hour07,
+			Hour08:       row.Hour08,
+			Hour09:       row.Hour09,
+			Hour10:       row.Hour10,
+			Hour11:       row.Hour11,
+			Hour12:       row.Hour12,
+			Hour13:       row.Hour13,
+			Hour14:       row.Hour14,
+			Hour15:       row.Hour15,
+			Hour16:       row.Hour16,
+			Hour17:       row.Hour17,
+			Hour18:       row.Hour18,
+			Hour19:       row.Hour19,
+			Hour20:       row.Hour20,
+			Hour21:       row.Hour21,
+			Hour22:       row.Hour22,
+			Hour23:       row.Hour23,
+		}
+	}
+
+	return result, nil
+}

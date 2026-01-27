@@ -74,6 +74,18 @@ export function useUser() {
     return 'free'
   })
 
+  const entitlements = computed<string[]>(() => {
+    const raw = currentUser.value?.entitlements
+    if (!raw || raw.trim() === '') return []
+    return raw.split('|').map(e => e.trim()).filter(e => e !== '')
+  })
+
+  function hasEntitlement(entitlement: string): boolean {
+    return entitlements.value.includes(entitlement)
+  }
+
+  const isAdmin = computed(() => hasEntitlement('admin'))
+
   return {
     user: currentUser,
     isLoading,
@@ -81,6 +93,9 @@ export function useUser() {
     errorMessage,
     isAuthed,
     userType,
+    entitlements,
+    hasEntitlement,
+    isAdmin,
     reload: reloadCurrentUser,
   }
 }

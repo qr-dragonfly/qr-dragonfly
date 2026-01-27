@@ -114,6 +114,116 @@ func NewRouter(srv Server) http.Handler {
 
 		rest := strings.TrimPrefix(r.URL.Path, "/api/clicks/")
 		rest = strings.Trim(rest, "/")
+
+		// Check for query-based endpoints first
+		if rest == "stats" {
+			// /api/clicks/stats?qrId=xxx
+			qrID := strings.TrimSpace(r.URL.Query().Get("qrId"))
+			if qrID == "" {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "qrId_required"})
+				return
+			}
+			st, err := srv.Store.GetStats(qrID)
+			if err != nil {
+				if errors.Is(err, store.ErrNotFound) {
+					writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
+					return
+				}
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "stats_failed"})
+				return
+			}
+			writeJSON(w, http.StatusOK, st)
+			return
+		}
+
+		if rest == "daily" {
+			// /api/clicks/daily?qrId=xxx&day=2026-01-02
+			qrID := strings.TrimSpace(r.URL.Query().Get("qrId"))
+			if qrID == "" {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "qrId_required"})
+				return
+			}
+
+			day := time.Now().UTC()
+			if raw := strings.TrimSpace(r.URL.Query().Get("day")); raw == "" {
+				raw = strings.TrimSpace(r.URL.Query().Get("date"))
+				if raw == "" {
+					// default: today (UTC)
+					day = time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+				} else {
+					parsed, err := time.Parse("2006-01-02", raw)
+					if err != nil {
+						writeJSON(w, http.StatusBadRequest, map[string]string{"error": "day_invalid"})
+						return
+					}
+					day = time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, time.UTC)
+				}
+			} else {
+				parsed, err := time.Parse("2006-01-02", raw)
+				if err != nil {
+					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "day_invalid"})
+					return
+				}
+				day = time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, time.UTC)
+			}
+
+			ds, err := srv.Store.GetDaily(qrID, day)
+			if err != nil {
+				if errors.Is(err, store.ErrNotFound) {
+					writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
+					return
+				}
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "daily_failed"})
+				return
+			}
+			writeJSON(w, http.StatusOK, ds)
+			return
+		}
+
+		if rest == "daily-batch" {
+			// /api/clicks/daily-batch?qrId=xxx&days=2026-01-19,2026-01-20,2026-01-21
+			qrID := strings.TrimSpace(r.URL.Query().Get("qrId"))
+			if qrID == "" {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "qrId_required"})
+				return
+			}
+
+			daysParam := strings.TrimSpace(r.URL.Query().Get("days"))
+			if daysParam == "" {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "days_required"})
+				return
+			}
+
+			dayStrings := strings.Split(daysParam, ",")
+			days := make([]time.Time, 0, len(dayStrings))
+			for _, ds := range dayStrings {
+				ds = strings.TrimSpace(ds)
+				if ds == "" {
+					continue
+				}
+				parsed, err := time.Parse("2006-01-02", ds)
+				if err != nil {
+					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_day_format"})
+					return
+				}
+				days = append(days, parsed)
+			}
+
+			if len(days) == 0 {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "no_valid_days"})
+				return
+			}
+
+			result, err := srv.Store.GetDailyBatch(qrID, days)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "batch_failed"})
+				return
+			}
+			writeJSON(w, http.StatusOK, result)
+			return
+		}
+
+		// Legacy path-based endpoints for backward compatibility
 		if rest == "" {
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -177,6 +287,44 @@ func NewRouter(srv Server) http.Handler {
 				return
 			}
 			writeJSON(w, http.StatusOK, ds)
+			return
+		}
+
+		if len(parts) == 2 && parts[1] == "daily-batch" {
+			// /api/clicks/{qrId}/daily-batch?days=2026-01-19,2026-01-20,2026-01-21
+			qrID := parts[0]
+			daysParam := strings.TrimSpace(r.URL.Query().Get("days"))
+			if daysParam == "" {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "days_required"})
+				return
+			}
+
+			dayStrings := strings.Split(daysParam, ",")
+			days := make([]time.Time, 0, len(dayStrings))
+			for _, ds := range dayStrings {
+				ds = strings.TrimSpace(ds)
+				if ds == "" {
+					continue
+				}
+				parsed, err := time.Parse("2006-01-02", ds)
+				if err != nil {
+					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_day_format"})
+					return
+				}
+				days = append(days, parsed)
+			}
+
+			if len(days) == 0 {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "no_valid_days"})
+				return
+			}
+
+			result, err := srv.Store.GetDailyBatch(qrID, days)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "batch_failed"})
+				return
+			}
+			writeJSON(w, http.StatusOK, result)
 			return
 		}
 

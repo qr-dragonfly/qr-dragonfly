@@ -7,6 +7,7 @@ type User struct {
 	Email        string    `json:"email"`
 	Name         string    `json:"name,omitempty"`
 	UserType     string    `json:"userType,omitempty"`
+	Entitlements string    `json:"entitlements,omitempty"`
 	CreatedAt    time.Time `json:"-"`
 	CreatedAtIso string    `json:"createdAtIso,omitempty"`
 }
