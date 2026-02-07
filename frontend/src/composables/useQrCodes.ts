@@ -1,7 +1,7 @@
 import { computed, ref, watchEffect } from 'vue'
 import { ApiError, qrCodesApi } from '../api'
 import { useUser } from './useUser'
-import { generateQrDataUrl } from '../lib/qr'
+import { generateQrDataUrl, generateQrInFormat, getFormatExtension, type QrFormat } from '../lib/qr'
 import { trackingUrlForQrId } from '../lib/tracking'
 import type { QrCodeItem } from '../types/qrCodeItem'
 
@@ -245,6 +245,23 @@ export function useQrCodes() {
     link.click()
   }
 
+  async function downloadQrCodeInFormat(qrCode: QrCodeItem, format: QrFormat): Promise<void> {
+    const trackingUrl = trackingUrlForQrId(qrCode.id)
+    const dataUrl = await generateQrInFormat(trackingUrl, format)
+    
+    const link = document.createElement('a')
+    link.href = dataUrl
+    const safeLabel = qrCode.label.trim().replace(/[^a-z0-9_-]+/gi, '_')
+    const extension = getFormatExtension(format)
+    link.download = `${safeLabel || 'qr'}_${qrCode.id}.${extension}`
+    link.click()
+    
+    // Clean up object URLs for SVG and EPS
+    if (format === 'svg' || format === 'eps') {
+      setTimeout(() => URL.revokeObjectURL(dataUrl), 100)
+    }
+  }
+
   return {
     qrCodes,
     hasQrCodes,
@@ -261,5 +278,6 @@ export function useQrCodes() {
     deleteQrCode,
     copyToClipboard,
     downloadQrCode,
+    downloadQrCodeInFormat,
   }
 }

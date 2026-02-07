@@ -9,6 +9,16 @@ export interface CreateCheckoutSessionResponse {
   url: string;
 }
 
+export interface CreateSubscriptionRequest {
+  plan: 'basic' | 'enterprise';
+  paymentMethodId: string;
+}
+
+export interface CreateSubscriptionResponse {
+  subscriptionId: string;
+  status: string;
+}
+
 export interface CreatePortalSessionResponse {
   url: string;
 }
@@ -20,6 +30,17 @@ export async function createCheckoutSession(
     path: '/api/stripe/checkout-session',
     method: 'POST',
     body: { plan },
+  });
+}
+
+export async function createSubscription(
+  plan: 'basic' | 'enterprise',
+  paymentMethodId: string
+): Promise<CreateSubscriptionResponse> {
+  return requestJson<CreateSubscriptionResponse>({
+    path: '/api/stripe/subscription',
+    method: 'POST',
+    body: { plan, paymentMethodId },
   });
 }
 

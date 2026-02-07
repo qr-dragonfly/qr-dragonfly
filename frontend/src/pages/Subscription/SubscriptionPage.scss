@@ -1,5 +1,25 @@
 @use '../../styles/variables' as *;
 
+.demoLink {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: rgba(100, 108, 255, 0.1);
+  border: 1px solid rgba(100, 108, 255, 0.3);
+  border-radius: 6px;
+  color: $color-link;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(100, 108, 255, 0.15);
+    border-color: rgba(100, 108, 255, 0.5);
+    transform: translateY(-1px);
+  }
+}
+
 .card {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
@@ -51,6 +71,25 @@
   opacity: 0.7;
   margin: 12px 0 0;
   font-size: 15px;
+}
+
+.billingActions {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  .button {
+    align-self: flex-start;
+  }
+}
+
+.billingHint {
+  font-size: 13px;
+  opacity: 0.6;
+  margin: 0;
 }
 
 .error {

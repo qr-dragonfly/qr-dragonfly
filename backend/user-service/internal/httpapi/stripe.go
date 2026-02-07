@@ -19,6 +19,11 @@ type createCheckoutSessionRequest struct {
 	Plan string `json:"plan"` // "basic" or "enterprise"
 }
 
+type createSubscriptionRequest struct {
+	Plan            string `json:"plan"`            // "basic" or "enterprise"
+	PaymentMethodID string `json:"paymentMethodId"` // Stripe payment method ID
+}
+
 type checkoutSessionResponse struct {
 	SessionID  string `json:"sessionId"`
 	SessionURL string `json:"url"`
@@ -73,6 +78,67 @@ func (srv *Server) handleCreateCheckoutSession(w http.ResponseWriter, r *http.Re
 	writeJSON(w, http.StatusOK, checkoutSessionResponse{
 		SessionID:  checkoutSession.ID,
 		SessionURL: checkoutSession.URL,
+	})
+}
+
+// handleCreateSubscription creates a subscription directly with a payment method
+func (srv *Server) handleCreateSubscription(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	access, _ := readCookie(r, "access_token")
+	if access == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "not_authenticated"})
+		return
+	}
+
+	if srv.StripeClient == nil {
+		writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "stripe_not_configured"})
+		return
+	}
+
+	// Get user from access token
+	user, err := getUserFromAccessToken(ctx, srv.Cognito, access)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "not_authenticated"})
+		return
+	}
+
+	var req createSubscriptionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+
+	req.Plan = strings.TrimSpace(strings.ToLower(req.Plan))
+	req.PaymentMethodID = strings.TrimSpace(req.PaymentMethodID)
+
+	if req.Plan != "basic" && req.Plan != "enterprise" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_plan"})
+		return
+	}
+
+	if req.PaymentMethodID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "payment_method_required"})
+		return
+	}
+
+	priceID, err := srv.StripeClient.GetPriceIDForPlan(req.Plan)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_plan"})
+		return
+	}
+
+	sub, err := srv.StripeClient.CreateSubscriptionWithPaymentMethod(user.Email, req.PaymentMethodID, priceID)
+	if err != nil {
+		log.Printf("stripe subscription error: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "subscription_failed"})
+		return
+	}
+
+	// Subscription created successfully
+	// The webhook will handle updating user entitlements
+	writeJSON(w, http.StatusOK, map[string]any{
+		"subscriptionId": sub.ID,
+		"status":         string(sub.Status),
 	})
 }
 

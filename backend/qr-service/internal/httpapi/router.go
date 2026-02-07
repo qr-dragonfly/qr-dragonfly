@@ -13,7 +13,8 @@ import (
 )
 
 type Server struct {
-	Store store.Store
+	Store       store.Store
+	AdminAPIKey string
 }
 
 type quota struct {
@@ -265,12 +266,111 @@ func NewRouter(srv Server) http.Handler {
 		return middleware.Recoverer(middleware.RequestID(middleware.ExposeResponseHeaders(middleware.EnforceJSONHandler(h))))
 	}
 
+	adminSampleDataHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Check admin key
+		if srv.AdminAPIKey == "" || r.Header.Get("X-Admin-Key") != srv.AdminAPIKey {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+
+		// Generate sample QR codes
+		sampleData := []struct {
+			label  string
+			url    string
+			active bool
+		}{
+			{"Product Landing Page", "https://example.com/products/widget-pro", true},
+			{"Marketing Campaign", "https://example.com/promo/summer-sale", true},
+			{"Event Registration", "https://example.com/events/conference-2026", true},
+			{"Menu QR Code", "https://restaurant.example.com/menu", true},
+			{"Business Card", "https://example.com/contact/john-smith", false},
+			{"Feedback Survey", "https://forms.example.com/feedback/q1-2026", true},
+			{"App Download", "https://app.example.com/download", true},
+			{"Support Portal", "https://support.example.com", false},
+			{"Newsletter Signup", "https://example.com/newsletter", true},
+			{"Social Media Profile", "https://social.example.com/company", true},
+		}
+
+		created := 0
+		for _, data := range sampleData {
+			_, err := srv.Store.Create(store.CreateInput{
+				Label:  data.label,
+				URL:    data.url,
+				Active: &data.active,
+			})
+			if err == nil {
+				created++
+			}
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"message": "sample data generated",
+			"created": created,
+		})
+	})
+
 	mux.Handle("/healthz", wrap(healthHandler))
 	mux.Handle("/api/qr-codes", wrap(collectionHandler))
 	mux.Handle("/api/qr-codes/", wrap(itemHandler))
 	mux.Handle("/api/settings", wrap(settingsHandler))
+	mux.Handle("/api/admin/generate-sample-data", wrap(adminSampleDataHandler))
+	mux.Handle("/api/dev/generate-sample-data", wrap(http.HandlerFunc(srv.devSampleDataHandler)))
 
 	return mux
+}
+
+func (srv *Server) devSampleDataHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get user ID from context (set by auth middleware)
+	userID, ok := r.Context().Value("user_id").(string)
+	if !ok || userID == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	// Generate sample QR codes for the authenticated user
+	sampleData := []struct {
+		label  string
+		url    string
+		active bool
+	}{
+		{"Product Landing Page", "https://example.com/products/widget-pro", true},
+		{"Marketing Campaign", "https://example.com/promo/summer-sale", true},
+		{"Event Registration", "https://example.com/events/conference-2026", true},
+		{"Menu QR Code", "https://restaurant.example.com/menu", true},
+		{"Contact Card", "https://example.com/contact/john-doe", true},
+		{"WiFi Access", "https://example.com/wifi/guest", true},
+		{"App Download", "https://apps.example.com/download", true},
+		{"Survey Link", "https://forms.example.com/feedback", true},
+		{"Document Share", "https://docs.example.com/guide.pdf", true},
+		{"Video Tutorial", "https://videos.example.com/tutorial", true},
+	}
+
+	created := 0
+	for _, data := range sampleData {
+		_, err := srv.Store.Create(store.CreateInput{
+			Label:  data.label,
+			URL:    data.url,
+			Active: &data.active,
+		})
+		if err == nil {
+			created++
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"message": "sample data generated",
+		"created": created,
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

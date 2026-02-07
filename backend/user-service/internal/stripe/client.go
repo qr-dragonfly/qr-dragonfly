@@ -7,6 +7,8 @@ import (
 	"github.com/stripe/stripe-go/v81/billingportal/session"
 	checkoutsession "github.com/stripe/stripe-go/v81/checkout/session"
 	"github.com/stripe/stripe-go/v81/customer"
+	"github.com/stripe/stripe-go/v81/paymentmethod"
+	"github.com/stripe/stripe-go/v81/subscription"
 	"github.com/stripe/stripe-go/v81/webhook"
 )
 
@@ -114,4 +116,54 @@ func (c *Client) GetPriceIDForPlan(plan string) (string, error) {
 	default:
 		return "", fmt.Errorf("invalid plan: %s", plan)
 	}
+}
+
+// CreateSubscriptionWithPaymentMethod creates a subscription using a payment method ID
+func (c *Client) CreateSubscriptionWithPaymentMethod(customerEmail, paymentMethodID, priceID string) (*stripe.Subscription, error) {
+	// Find or create customer
+	customerID, err := c.findOrCreateCustomer(customerEmail)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find/create customer: %w", err)
+	}
+
+	// Attach payment method to customer
+	pmParams := &stripe.PaymentMethodAttachParams{
+		Customer: stripe.String(customerID),
+	}
+	_, err = paymentmethod.Attach(paymentMethodID, pmParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to attach payment method: %w", err)
+	}
+
+	// Set as default payment method
+	custParams := &stripe.CustomerParams{
+		InvoiceSettings: &stripe.CustomerInvoiceSettingsParams{
+			DefaultPaymentMethod: stripe.String(paymentMethodID),
+		},
+	}
+	_, err = customer.Update(customerID, custParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set default payment method: %w", err)
+	}
+
+	// Create subscription
+	subParams := &stripe.SubscriptionParams{
+		Customer: stripe.String(customerID),
+		Items: []*stripe.SubscriptionItemsParams{
+			{
+				Price: stripe.String(priceID),
+			},
+		},
+		PaymentSettings: &stripe.SubscriptionPaymentSettingsParams{
+			PaymentMethodTypes: stripe.StringSlice([]string{"card"}),
+		},
+		Expand: stripe.StringSlice([]string{"latest_invoice.payment_intent"}),
+	}
+
+	sub, err := subscription.New(subParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create subscription: %w", err)
+	}
+
+	return sub, nil
 }

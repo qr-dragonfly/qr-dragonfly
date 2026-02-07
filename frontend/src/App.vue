@@ -79,6 +79,14 @@ const isAuthRoute = computed(() => {
           <RouterLink class="footerLink" to="/privacy">Privacy Policy</RouterLink>
           <span class="footerSep" aria-hidden="true">•</span>
           <RouterLink class="footerLink" to="/cookies">Cookie Policy</RouterLink>
+          <span class="footerSep" aria-hidden="true">•</span>
+          <a class="footerLink" href="mailto:support@qr-dragonfly.com">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;">
+              <rect x="2" y="4" width="20" height="16" rx="2"/>
+              <path d="m2 7 10 7 10-7"/>
+            </svg>
+            Support
+          </a>
         </nav>
       </div>
     </footer>

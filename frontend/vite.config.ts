@@ -25,11 +25,23 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
+      '/api/admin': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/api/dev': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
       '/api/clicks': {
         target: 'http://localhost:8082',
         changeOrigin: true,
       },
       '/api/users': {
+        target: 'http://localhost:8081',
+        changeOrigin: true,
+      },
+      '/api/stripe': {
         target: 'http://localhost:8081',
         changeOrigin: true,
       },

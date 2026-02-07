@@ -82,6 +82,7 @@ type Server struct {
 	// Stripe integration (optional)
 	StripeClient interface {
 		CreateCheckoutSession(customerEmail string, priceID string) (*stripe.CheckoutSession, error)
+		CreateSubscriptionWithPaymentMethod(customerEmail, paymentMethodID, priceID string) (*stripe.Subscription, error)
 		CreateCustomerPortalSession(customerEmail string) (*stripe.BillingPortalSession, error)
 		ConstructEvent(payload []byte, signature string) (stripe.Event, error)
 		GetPriceIDForPlan(plan string) (string, error)
@@ -251,9 +252,11 @@ func NewRouter(srv Server) http.Handler {
 	// Stripe routes (if Stripe is configured)
 	if srv.StripeClient != nil {
 		checkoutHandler := http.HandlerFunc(srv.handleCreateCheckoutSession)
+		subscriptionHandler := http.HandlerFunc(srv.handleCreateSubscription)
 		portalHandler := http.HandlerFunc(srv.handleCreatePortalSession)
 		webhookHandler := http.HandlerFunc(srv.handleStripeWebhook)
 		mux.Handle("/api/stripe/checkout-session", wrap(checkoutHandler))
+		mux.Handle("/api/stripe/subscription", wrap(subscriptionHandler))
 		mux.Handle("/api/stripe/portal-session", wrap(portalHandler))
 		mux.Handle("/api/stripe/webhook", wrap(webhookHandler))
 	}

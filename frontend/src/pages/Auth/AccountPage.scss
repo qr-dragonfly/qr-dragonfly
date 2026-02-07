@@ -29,6 +29,16 @@
   background: color-mix(in srgb, $color-fg 12%, transparent);
 }
 
+.link {
+  color: #a855f7;
+  text-decoration: none;
+  font-weight: 600;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .secondary {
   border: 1px solid color-mix(in srgb, $color-fg 12%, transparent);
   background: color-mix(in srgb, $color-bg 55%, transparent);

@@ -12,9 +12,11 @@ import ResetPasswordPage from '../pages/Auth/ResetPasswordPage.vue'
 import TermsOfServicePage from '../pages/Legal/TermsOfServicePage.vue'
 import PrivacyPolicyPage from '../pages/Legal/PrivacyPolicyPage.vue'
 import CookiePolicyPage from '../pages/Legal/CookiePolicyPage.vue'
+import CodeOfConductPage from '../pages/Legal/CodeOfConductPage.vue'
 
 import QrCodeStatsPage from '../pages/QrCodeStats/QrCodeStatsPage.vue'
 import SubscriptionPage from '../pages/Subscription/SubscriptionPage.vue'
+import StripeCheckoutPage from '../pages/Subscription/StripeCheckoutPage.vue'
 import AdminPage from '../pages/Admin/AdminPage.vue'
 import ClientPage from '../pages/Client/ClientPage.vue'
 
@@ -36,8 +38,10 @@ export const router = createRouter({
     { path: '/terms', name: 'terms', component: TermsOfServicePage },
     { path: '/privacy', name: 'privacy', component: PrivacyPolicyPage },
     { path: '/cookies', name: 'cookies', component: CookiePolicyPage },
+    { path: '/code-of-conduct', name: 'code-of-conduct', component: CodeOfConductPage },
 
     { path: '/subscription', name: 'subscription', component: SubscriptionPage },
+    { path: '/checkout', name: 'checkout', component: StripeCheckoutPage },
     { path: '/qr-codes/:id/stats', name: 'qr-code-stats', component: QrCodeStatsPage },
     
     { path: '/admin', name: 'admin', component: AdminPage },

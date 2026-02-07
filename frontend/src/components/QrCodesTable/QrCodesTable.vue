@@ -260,15 +260,15 @@ type TrendState = {
 const trendById = ref<Record<string, TrendState>>({})
 const trendLoading = ref<Record<string, boolean>>({})
 
-async function fetchDailyClicks(qrId: string, dayIso: string): Promise<DailyClicks | null> {
+async function fetchDailyClicksBatch(qrId: string, dayIsos: string[]): Promise<Record<string, DailyClicks>> {
   try {
-    return await requestJson<DailyClicks>({
+    return await requestJson<Record<string, DailyClicks>>({
       method: 'GET',
-      path: `/api/clicks/${encodeURIComponent(qrId)}/daily`,
-      query: { day: dayIso },
+      path: '/api/clicks/daily-batch',
+      query: { qrId, days: dayIsos.join(',') },
     })
   } catch {
-    return null
+    return {}
   }
 }
 
@@ -323,8 +323,8 @@ async function loadTrend(qrId: string) {
 
   try {
     const days = last7DaysIso.value
-    const results = await Promise.all(days.map((d) => fetchDailyClicks(qrId, d)))
-    const counts = results.map((r) => r?.total ?? 0)
+    const batch = await fetchDailyClicksBatch(qrId, days)
+    const counts = days.map((d) => batch[d]?.total ?? 0)
     const total = counts.reduce((a, b) => a + b, 0)
     const delta = counts.length >= 2 ? (counts[counts.length - 1] ?? 0) - (counts[counts.length - 2] ?? 0) : 0
     const isUp = delta >= 0

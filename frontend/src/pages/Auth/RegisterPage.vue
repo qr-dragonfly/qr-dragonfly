@@ -9,6 +9,7 @@ const router = useRouter()
 
 const email = ref('')
 const password = ref('')
+const agreedToTerms = ref(false)
 
 const busy = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -22,6 +23,11 @@ async function submit() {
   const p = password.value.trim()
   if (!e || !p) {
     errorMessage.value = 'Email and password are required.'
+    return
+  }
+
+  if (!agreedToTerms.value) {
+    errorMessage.value = 'You must agree to the Terms of Service to continue.'
     return
   }
 
@@ -59,8 +65,15 @@ async function submit() {
           <input v-model="password" class="input" type="password" autocomplete="new-password" />
         </label>
 
+        <label class="checkboxField">
+          <input v-model="agreedToTerms" type="checkbox" class="checkbox" />
+          <span class="checkboxLabel">
+            I agree to the <RouterLink to="/terms" target="_blank" class="link">Terms of Service</RouterLink>
+          </span>
+        </label>
+
         <div class="actions">
-          <AppButton type="submit" :disabled="busy">{{ busy ? 'Creating…' : 'Create account' }}</AppButton>
+          <AppButton type="submit" :disabled="busy || !agreedToTerms">{{ busy ? 'Creating…' : 'Create account' }}</AppButton>
         </div>
       </form>
 

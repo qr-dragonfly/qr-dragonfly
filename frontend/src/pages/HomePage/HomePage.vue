@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useQrCodes } from '../../composables/useQrCodes'
 import { useUser } from '../../composables/useUser'
 import CreateQrCodeForm from '../../components/CreateQrCodeForm/CreateQrCodeForm.vue'
 import DefaultRedirectSettings from '../../components/DefaultRedirectSettings/DefaultRedirectSettings.vue'
 import QrCodesTable from '../../components/QrCodesTable/QrCodesTable.vue'
+import FormatSelectorModal from '../../components/QrCodesTable/FormatSelectorModal.vue'
+import type { QrCodeItem } from '../../types/qrCodeItem'
+import type { QrFormat } from '../../lib/qr'
 
 const { isAuthed } = useUser()
 
@@ -18,9 +22,29 @@ const {
   updateQrCode,
   setQrCodeActive,
   copyToClipboard,
-  downloadQrCode,
+  downloadQrCodeInFormat,
   deleteQrCode,
 } = useQrCodes()
+
+const showFormatSelector = ref(false)
+const qrCodeToDownload = ref<QrCodeItem | null>(null)
+
+function openFormatSelector(qrCode: QrCodeItem) {
+  qrCodeToDownload.value = qrCode
+  showFormatSelector.value = true
+}
+
+function closeFormatSelector() {
+  showFormatSelector.value = false
+  qrCodeToDownload.value = null
+}
+
+async function handleDownload(format: QrFormat) {
+  if (qrCodeToDownload.value) {
+    await downloadQrCodeInFormat(qrCodeToDownload.value, format)
+  }
+  closeFormatSelector()
+}
 </script>
 
 <template>
@@ -55,10 +79,16 @@ const {
       :errorMessage="errorMessage"
       :showSampleWhenEmpty="!isAuthed"
       @copy-url="copyToClipboard"
-      @download="downloadQrCode"
+      @download="openFormatSelector"
       @remove="deleteQrCode"
       @update="updateQrCode"
       @set-active="setQrCodeActive"
+    />
+
+    <FormatSelectorModal
+      v-if="showFormatSelector"
+      @close="closeFormatSelector"
+      @download="handleDownload"
     />
   </main>
 </template>

@@ -87,7 +87,7 @@ const route = useRoute()
 
 const id = computed(() => String(route.params.id ?? ''))
 
-const { isAuthed, isLoaded, userType } = useUser()
+const { isAuthed, isLoaded, userType, isAdmin } = useUser()
 
 const isFreeUser = computed(() => userType.value === 'free')
 
@@ -102,13 +102,29 @@ const qrCode = ref<{ id: string; label: string; url: string; active: boolean } |
 const isLoading = ref(false)
 const errorMessage = ref<string | null>(null)
 
-const last7Days = computed(() => [dateIsoUTC(6), dateIsoUTC(5), dateIsoUTC(4), dateIsoUTC(3), dateIsoUTC(2), dateIsoUTC(1), dateIsoUTC(0)])
+// Date range selection
+const startDate = ref<string>(dateIsoUTC(6))
+const endDate = ref<string>(dateIsoUTC(0))
+
+const dateRange = computed(() => {
+  const start = new Date(startDate.value)
+  const end = new Date(endDate.value)
+  const days: string[] = []
+  
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    days.push(d.toISOString().slice(0, 10))
+  }
+  
+  return days
+})
+
+const last7Days = computed(() => dateRange.value)
 const selectedDayIso = ref<string>(dateIsoUTC(0))
 
 const dailyByDay = ref<Record<string, DailyClicks | null>>({})
 
 const last7Total = computed(() => {
-  return last7Days.value.reduce((sum, day) => sum + (dailyByDay.value[day]?.total ?? 0), 0)
+  return dateRange.value.reduce((sum, day) => sum + (dailyByDay.value[day]?.total ?? 0), 0)
 })
 
 const selectedDaily = computed(() => dailyByDay.value[selectedDayIso.value] ?? null)
@@ -151,20 +167,26 @@ const displayLast7Total = computed(() => (isFreeUser.value ? 1247 : last7Total.v
 const displaySelectedDayTotal = computed(() => (isFreeUser.value ? 342 : (selectedDaily.value?.total ?? 0)))
 const displayHourlyRows = computed(() => (isFreeUser.value ? sampleHourlyRows : hourlyRows.value))
 
+let loadingId = ''
+
 watchEffect(() => {
   if (!isAuthed.value) return
   if (!id.value) return
-  if (isLoading.value) return // Prevent duplicate requests
+
+  // Prevent duplicate requests for the same ID
+  const currentId = id.value
+  if (loadingId === currentId) return
+  loadingId = currentId
 
   errorMessage.value = null
   isLoading.value = true
   void (async () => {
     try {
-      const item = await qrCodesApi.getById(id.value, userType.value)
+      const item = await qrCodesApi.getById(currentId, userType.value)
       qrCode.value = { id: item.id, label: item.label, url: item.url, active: item.active }
 
       // Fetch daily click buckets for the last 7 days using batch endpoint.
-      const batchResult = await fetchDailyClicksBatch(id.value, last7Days.value)
+      const batchResult = await fetchDailyClicksBatch(currentId, last7Days.value)
       const next: Record<string, DailyClicks | null> = {}
       last7Days.value.forEach((dayIso) => {
         next[dayIso] = batchResult[dayIso] ?? null
@@ -181,9 +203,43 @@ watchEffect(() => {
       dailyByDay.value = {}
     } finally {
       isLoading.value = false
+      loadingId = ''
     }
   })()
 })
+
+// Admin sample data generation
+const busyGenerateSample = ref(false)
+const successMessage = ref<string | null>(null)
+
+async function generateSampleData() {
+  busyGenerateSample.value = true
+  errorMessage.value = null
+  successMessage.value = null
+
+  try {
+    const response = await fetch('/api/dev/generate-sample-data', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to generate sample data')
+    }
+
+    const result = await response.json()
+    successMessage.value = `Generated ${result.created} sample QR codes`
+    setTimeout(() => {
+      successMessage.value = null
+    }, 5000)
+  } catch (err) {
+    errorMessage.value = err instanceof Error ? err.message : 'Failed to generate sample data'
+  } finally {
+    busyGenerateSample.value = false
+  }
+}
 </script>
 
 <template>
@@ -198,7 +254,23 @@ watchEffect(() => {
       <div class="topRow">
         <RouterLink class="link" to="/">← Back to QR codes</RouterLink>
         <div class="spacer" />
+        <button v-if="isAdmin" class="button secondary" type="button" @click="generateSampleData" :disabled="busyGenerateSample">
+          {{ busyGenerateSample ? 'Generating...' : 'Generate Sample Data' }}
+        </button>
         <span v-if="qrCode" class="pill" :class="qrCode.active ? 'ok' : 'off'">{{ qrCode.active ? 'Active' : 'Inactive' }}</span>
+      </div>
+      
+      <p v-if="successMessage" class="success">{{ successMessage }}</p>
+
+      <div class="dateRangeSelector">
+        <label class="dateField">
+          <span class="dateLabel">Start Date</span>
+          <input v-model="startDate" type="date" class="dateInput" />
+        </label>
+        <label class="dateField">
+          <span class="dateLabel">End Date</span>
+          <input v-model="endDate" type="date" class="dateInput" />
+        </label>
       </div>
 
       <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
@@ -225,12 +297,12 @@ watchEffect(() => {
 
         <div class="statsGrid" :class="{ blurred: isFreeUser }">
           <div class="statCard">
-            <div class="statLabel">Clicks (last 7 days)</div>
+            <div class="statLabel">Total Clicks</div>
             <div class="statValue">{{ displayLast7Total }}</div>
           </div>
 
           <div class="statCard">
-            <div class="statLabel">Day</div>
+            <div class="statLabel">Select Day</div>
             <select v-model="selectedDayIso" class="select" aria-label="Select day">
               <option v-for="d in last7Days" :key="d" :value="d">{{ d }}</option>
             </select>

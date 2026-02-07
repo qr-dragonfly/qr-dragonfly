@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useUser } from '../../composables/useUser'
-import { createCheckoutSession } from '../../api/stripe/stripe.api'
+import { createPortalSession } from '../../api/stripe/stripe.api'
 
 const route = useRoute()
+const router = useRouter()
 const { user, userType } = useUser()
 
 type PlanTier = {
@@ -37,8 +38,8 @@ const plans: PlanTier[] = [
   {
     name: 'Basic',
     userType: 'basic',
-    price: '$19',
-    priceDetail: 'per month',
+    price: '$6',
+    priceDetail: 'per month + tax',
     maxActive: 50,
     maxTotal: 200,
     features: [
@@ -53,14 +54,15 @@ const plans: PlanTier[] = [
   {
     name: 'Enterprise',
     userType: 'enterprise',
-    price: '$99',
-    priceDetail: 'per month',
+    price: '$65',
+    priceDetail: 'per month + tax',
     maxActive: 2000,
     maxTotal: 10000,
     features: [
       'Up to 2,000 active QR codes',
       'Up to 10,000 total QR codes',
       'Advanced analytics & exports',
+      'Multi-account management (coming soon)',
       'HTTPS URLs only',
       'Dedicated support',
     ],
@@ -71,9 +73,9 @@ const currentPlan = computed(() => {
   return plans.find((p) => p.userType === userType.value) || plans[0]
 })
 
-const checkoutLoading = ref(false)
 const checkoutError = ref<string | null>(null)
 const checkoutSuccess = ref(false)
+const portalLoading = ref(false)
 
 onMounted(() => {
   // Check for success query param
@@ -87,17 +89,22 @@ onMounted(() => {
 })
 
 async function handleSubscribe(plan: 'basic' | 'enterprise') {
-  checkoutLoading.value = true
+  // Navigate to Stripe Elements checkout page
+  router.push({ path: '/checkout', query: { plan } })
+}
+
+async function handleManageBilling() {
+  portalLoading.value = true
   checkoutError.value = null
 
   try {
-    const response = await createCheckoutSession(plan)
-    // Redirect to Stripe Checkout
+    const response = await createPortalSession()
+    // Redirect to Stripe Customer Portal
     window.location.href = response.url
   } catch (err) {
-    console.error('Checkout error:', err)
-    checkoutError.value = 'Failed to start checkout. Please try again.'
-    checkoutLoading.value = false
+    console.error('Portal error:', err)
+    checkoutError.value = 'Failed to open billing portal. Please try again.'
+    portalLoading.value = false
   }
 }
 
@@ -119,6 +126,12 @@ async function handleSubscribe(plan: 'basic' | 'enterprise') {
       <p class="muted">
         You have {{ currentPlan.maxActive }} active and {{ currentPlan.maxTotal }} total QR code slots.
       </p>
+      <div v-if="userType !== 'free'" class="billingActions">
+        <button class="button secondary" @click="handleManageBilling" :disabled="portalLoading">
+          {{ portalLoading ? 'Loading...' : '⚙️ Manage Billing & Payments' }}
+        </button>
+        <p class="billingHint">Update payment method, view invoices, or cancel subscription</p>
+      </div>
     </section>
 
     <div v-if="checkoutSuccess" class="card success">
@@ -147,10 +160,9 @@ async function handleSubscribe(plan: 'basic' | 'enterprise') {
           <button 
             v-else 
             class="button" 
-            :disabled="checkoutLoading"
             @click="handleSubscribe(plan.userType)"
           >
-            {{ checkoutLoading ? 'Loading...' : 'Subscribe' }}
+            Subscribe
           </button>
         </div>
       </div>

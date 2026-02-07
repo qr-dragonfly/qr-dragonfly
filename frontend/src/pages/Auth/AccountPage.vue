@@ -150,6 +150,22 @@ async function manageSubscription() {
       <div v-if="isAuthed" class="divider" />
 
       <div v-if="isAuthed">
+        <h2 class="sectionTitle" style="margin-top: 0">Support</h2>
+        <p class="muted">
+          Need help? Contact us at 
+          <a href="mailto:support@qr-dragonfly.com" class="link">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 2px;">
+              <rect x="2" y="4" width="20" height="16" rx="2"/>
+              <path d="m2 7 10 7 10-7"/>
+            </svg>
+            support@qr-dragonfly.com
+          </a>
+        </p>
+      </div>
+
+      <div v-if="isAuthed" class="divider" />
+
+      <div v-if="isAuthed">
         <h2 class="sectionTitle" style="margin-top: 0">Security</h2>
 
         <div class="actions">

@@ -19,6 +19,7 @@ func main() {
 	port := envOr("PORT", "8080")
 	allowedOrigins := splitCSV(envOr("CORS_ALLOW_ORIGINS", "http://localhost:5173"))
 	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	adminKey := envOr("ADMIN_API_KEY", "")
 
 	ctx := context.Background()
 
@@ -38,7 +39,7 @@ func main() {
 		log.Printf("qr-service using in-memory storage (set DATABASE_URL to persist)")
 	}
 
-	router := httpapi.NewRouter(httpapi.Server{Store: st})
+	router := httpapi.NewRouter(httpapi.Server{Store: st, AdminAPIKey: adminKey})
 
 	// Apply middleware layers (order matters!)
 	var handler http.Handler = router

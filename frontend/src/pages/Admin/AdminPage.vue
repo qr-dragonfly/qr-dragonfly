@@ -118,6 +118,37 @@ onMounted(() => {
 function saveAdminKey() {
   localStorage.setItem('adminKey', adminKey.value.trim())
 }
+
+const busyGenerateSample = ref(false)
+
+async function generateSampleData() {
+  busyGenerateSample.value = true
+  errorMessage.value = null
+  successMessage.value = null
+
+  try {
+    const response = await fetch('/api/dev/generate-sample-data', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to generate sample data')
+    }
+
+    const result = await response.json()
+    successMessage.value = `Generated sample data: ${result.created} QR codes created`
+    setTimeout(() => {
+      successMessage.value = null
+    }, 5000)
+  } catch (err) {
+    errorMessage.value = 'Failed to generate sample data. Check your admin key.'
+  } finally {
+    busyGenerateSample.value = false
+  }
+}
 </script>
 
 <template>
@@ -144,6 +175,12 @@ function saveAdminKey() {
             </button>
           </div>
         </label>
+      </div>
+
+      <div class="adminActions">
+        <button class="button secondary" type="button" @click="generateSampleData" :disabled="busyGenerateSample">
+          {{ busyGenerateSample ? 'Generating...' : '🎲 Generate Sample QR Codes' }}
+        </button>
       </div>
 
       <p v-if="successMessage" class="success">{{ successMessage }}</p>

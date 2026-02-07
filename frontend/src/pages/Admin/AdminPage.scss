@@ -4,6 +4,11 @@
   margin-bottom: $space-lg;
 }
 
+.adminActions {
+  margin-top: $space-md;
+  margin-bottom: $space-lg;
+}
+
 .keyInput {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -134,6 +139,7 @@
   display: flex;
   gap: $space-md;
   justify-content: center;
+  align-items: center;
   margin-top: $space-lg;
 }
 
