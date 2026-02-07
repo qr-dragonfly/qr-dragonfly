@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useUser } from '../../composables/useUser'
-import { createPortalSession } from '../../api/stripe/stripe.api'
+import { createPortalSession, createCheckoutSession } from '../../api/stripe/stripe.api'
 
 const route = useRoute()
-const router = useRouter()
 const { user, userType } = useUser()
 
 type PlanTier = {
@@ -76,6 +75,20 @@ const currentPlan = computed(() => {
 const checkoutError = ref<string | null>(null)
 const checkoutSuccess = ref(false)
 const portalLoading = ref(false)
+const showConfirmModal = ref(false)
+const pendingPlan = ref<PlanTier | null>(null)
+const actionLoading = ref(false)
+
+const planAction = computed(() => {
+  if (!pendingPlan.value || !currentPlan.value) return null
+  
+  const currentIndex = plans.findIndex(p => p.userType === currentPlan.value?.userType)
+  const targetIndex = plans.findIndex(p => p.userType === pendingPlan.value?.userType)
+  
+  if (targetIndex > currentIndex) return 'upgrade'
+  if (targetIndex < currentIndex) return 'downgrade'
+  return null
+})
 
 onMounted(() => {
   // Check for success query param
@@ -88,9 +101,45 @@ onMounted(() => {
   }
 })
 
-async function handleSubscribe(plan: 'basic' | 'enterprise') {
-  // Navigate to Stripe Elements checkout page
-  router.push({ path: '/checkout', query: { plan } })
+function handlePlanClick(plan: PlanTier) {
+  // Don't do anything for current plan
+  if (plan.userType === userType.value) {
+    return
+  }
+  
+  pendingPlan.value = plan
+  showConfirmModal.value = true
+  checkoutError.value = null
+}
+
+function closeModal() {
+  showConfirmModal.value = false
+  pendingPlan.value = null
+  actionLoading.value = false
+}
+
+async function confirmPlanChange() {
+  if (!pendingPlan.value) return
+  
+  actionLoading.value = true
+  checkoutError.value = null
+  
+  try {
+    if (planAction.value === 'upgrade') {
+      // For upgrades, redirect to checkout
+      const response = await createCheckoutSession(pendingPlan.value.userType as 'basic' | 'enterprise')
+      window.location.href = response.url
+    } else if (planAction.value === 'downgrade') {
+      // For downgrades (including to free), use the portal
+      const response = await createPortalSession()
+      window.location.href = response.url
+    }
+  } catch (err) {
+    console.error('Plan change error:', err)
+    checkoutError.value = `Failed to ${planAction.value}. Please try again.`
+    actionLoading.value = false
+    closeModal()
+  }
 }
 
 async function handleManageBilling() {
@@ -106,6 +155,17 @@ async function handleManageBilling() {
     checkoutError.value = 'Failed to open billing portal. Please try again.'
     portalLoading.value = false
   }
+}
+
+function getPlanButtonText(plan: PlanTier): string {
+  if (!currentPlan.value) return 'Select'
+  
+  const currentIndex = plans.findIndex(p => p.userType === currentPlan.value?.userType)
+  const targetIndex = plans.findIndex(p => p.userType === plan.userType)
+  
+  if (targetIndex > currentIndex) return 'Upgrade'
+  if (targetIndex < currentIndex) return 'Downgrade'
+  return 'Select'
 }
 
 </script>
@@ -156,13 +216,13 @@ async function handleManageBilling() {
 
         <div class="planActions">
           <button v-if="plan.userType === userType" class="button current" disabled>Current Plan</button>
-          <button v-else-if="plan.userType === 'free'" class="button secondary" disabled>Default Plan</button>
           <button 
             v-else 
             class="button" 
-            @click="handleSubscribe(plan.userType)"
+            :class="{ primary: plan.highlight, secondary: plan.userType === 'free' }"
+            @click="handlePlanClick(plan)"
           >
-            Subscribe
+            {{ getPlanButtonText(plan) }}
           </button>
         </div>
       </div>
@@ -192,6 +252,58 @@ async function handleManageBilling() {
         </p>
       </div>
     </section>
+
+    <!-- Confirmation Modal -->
+    <div v-if="showConfirmModal" class="modalOverlay" @click="closeModal">
+      <div class="modal" @click.stop>
+        <div class="modalHeader">
+          <h2 class="modalTitle">Confirm {{ planAction }}</h2>
+          <button class="modalClose" @click="closeModal">×</button>
+        </div>
+        
+        <div class="modalBody">
+          <p v-if="planAction === 'upgrade'">
+            You're about to upgrade to <strong>{{ pendingPlan?.name }}</strong> plan ({{ pendingPlan?.price }}/{{ pendingPlan?.priceDetail }}).
+          </p>
+          <p v-else-if="planAction === 'downgrade'">
+            You're about to downgrade to <strong>{{ pendingPlan?.name }}</strong> plan ({{ pendingPlan?.price }}/{{ pendingPlan?.priceDetail }}).
+          </p>
+          
+          <div class="planComparison">
+            <div class="comparisonItem">
+              <span class="label">Active QR codes:</span>
+              <span class="value">
+                {{ currentPlan?.maxActive }} → {{ pendingPlan?.maxActive }}
+              </span>
+            </div>
+            <div class="comparisonItem">
+              <span class="label">Total QR codes:</span>
+              <span class="value">
+                {{ currentPlan?.maxTotal }} → {{ pendingPlan?.maxTotal }}
+              </span>
+            </div>
+          </div>
+          
+          <p v-if="planAction === 'upgrade'" class="modalNote">
+            You'll be redirected to complete your payment.
+          </p>
+          <p v-else-if="planAction === 'downgrade'" class="modalNote">
+            You'll be redirected to the billing portal to manage your subscription. Changes will take effect at the end of your current billing period.
+          </p>
+        </div>
+        
+        <div class="modalFooter">
+          <button class="button secondary" @click="closeModal" :disabled="actionLoading">Cancel</button>
+          <button 
+            class="button primary" 
+            @click="confirmPlanChange" 
+            :disabled="actionLoading"
+          >
+            {{ actionLoading ? 'Processing...' : `Confirm ${planAction}` }}
+          </button>
+        </div>
+      </div>
+    </div>
   </main>
 </template>
 

@@ -90,6 +90,7 @@ const id = computed(() => String(route.params.id ?? ''))
 const { isAuthed, isLoaded, userType, isAdmin } = useUser()
 
 const isFreeUser = computed(() => userType.value === 'free')
+const isEnterpriseUser = computed(() => userType.value === 'enterprise' || isAdmin.value)
 
 watchEffect(() => {
   if (!isLoaded.value) return
@@ -240,6 +241,65 @@ async function generateSampleData() {
     busyGenerateSample.value = false
   }
 }
+
+// CSV export functionality for enterprise users
+const exportingCsv = ref(false)
+
+function exportToCSV() {
+  if (!qrCode.value) return
+  
+  exportingCsv.value = true
+  
+  try {
+    // Build CSV header
+    const headers = ['Date', 'Total Clicks', '00:00', '01:00', '02:00', '03:00', '04:00', '05:00', 
+                     '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', 
+                     '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', 
+                     '22:00', '23:00']
+    
+    // Build CSV rows
+    const rows = dateRange.value.map(dayIso => {
+      const daily = dailyByDay.value[dayIso]
+      if (!daily) {
+        return [dayIso, '0', ...Array(24).fill('0')]
+      }
+      
+      const hourlyData = hoursArray(daily)
+      return [dayIso, daily.total.toString(), ...hourlyData.map(h => h.toString())]
+    })
+    
+    // Combine header and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n')
+    
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    
+    const filename = `${qrCode.value.label.replace(/[^a-z0-9]/gi, '_')}_${startDate.value}_to_${endDate.value}.csv`
+    
+    link.setAttribute('href', url)
+    link.setAttribute('download', filename)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    
+    successMessage.value = 'CSV exported successfully'
+    setTimeout(() => {
+      successMessage.value = null
+    }, 3000)
+  } catch (err) {
+    errorMessage.value = 'Failed to export CSV'
+    console.error('CSV export error:', err)
+  } finally {
+    exportingCsv.value = false
+  }
+}
 </script>
 
 <template>
@@ -254,6 +314,15 @@ async function generateSampleData() {
       <div class="topRow">
         <RouterLink class="link" to="/">← Back to QR codes</RouterLink>
         <div class="spacer" />
+        <button 
+          v-if="isEnterpriseUser && qrCode && !isFreeUser" 
+          class="button primary" 
+          type="button" 
+          @click="exportToCSV" 
+          :disabled="exportingCsv || isLoading"
+        >
+          {{ exportingCsv ? 'Exporting...' : '📥 Export CSV' }}
+        </button>
         <button v-if="isAdmin" class="button secondary" type="button" @click="generateSampleData" :disabled="busyGenerateSample">
           {{ busyGenerateSample ? 'Generating...' : 'Generate Sample Data' }}
         </button>

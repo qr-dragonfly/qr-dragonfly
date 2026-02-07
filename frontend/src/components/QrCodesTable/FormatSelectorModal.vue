@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import type { QrFormat } from '../../lib/qr'
 
 const FORMAT_STORAGE_KEY = 'qrDownloadFormat'
@@ -62,12 +62,26 @@ const emit = defineEmits<{
 
 const selectedFormat = ref<QrFormat>('png')
 
+function handleKeyDown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    emit('close')
+  }
+}
+
 onMounted(() => {
   // Load last used format from localStorage
   const saved = localStorage.getItem(FORMAT_STORAGE_KEY)
   if (saved && ['png', 'jpeg', 'svg', 'eps'].includes(saved)) {
     selectedFormat.value = saved as QrFormat
   }
+  
+  // Add escape key listener
+  window.addEventListener('keydown', handleKeyDown)
+})
+
+onUnmounted(() => {
+  // Clean up event listener
+  window.removeEventListener('keydown', handleKeyDown)
 })
 
 function handleDownload() {
