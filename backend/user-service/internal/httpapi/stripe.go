@@ -127,12 +127,16 @@ func (srv *Server) handleCreateSubscription(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	log.Printf("creating subscription for %s, plan: %s, priceID: %s", user.Email, req.Plan, priceID)
+
 	sub, err := srv.StripeClient.CreateSubscriptionWithPaymentMethod(user.Email, req.PaymentMethodID, priceID)
 	if err != nil {
 		log.Printf("stripe subscription error: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "subscription_failed"})
 		return
 	}
+
+	log.Printf("subscription created successfully: %s, status: %s", sub.ID, sub.Status)
 
 	// Subscription created successfully
 	// The webhook will handle updating user entitlements
@@ -199,6 +203,8 @@ func (srv *Server) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	switch event.Type {
 	case "checkout.session.completed":
 		srv.handleCheckoutCompleted(event)
+	case "customer.subscription.created":
+		srv.handleSubscriptionCreated(event)
 	case "customer.subscription.updated":
 		srv.handleSubscriptionUpdated(event)
 	case "customer.subscription.deleted":
@@ -231,14 +237,53 @@ func (srv *Server) handleCheckoutCompleted(event stripe.Event) {
 		return
 	}
 
-	// Determine subscription tier from line items
+	// Get subscription details to determine tier
 	entitlement := "free" // default
-	if len(session.LineItems.Data) > 0 {
-		priceID := session.LineItems.Data[0].Price.ID
-		entitlement = srv.getEntitlementFromPriceID(priceID)
+
+	// Try to get from metadata first (if we set it during session creation)
+	if meta, ok := session.Metadata["plan"]; ok {
+		entitlement = meta
+		log.Printf("got entitlement from metadata: %s", entitlement)
+	} else if session.Subscription != nil {
+		// Get subscription details
+		subscriptionID := session.Subscription.ID
+
+		if subscriptionID != "" {
+			entitlement = srv.getEntitlementFromSubscriptionID(subscriptionID)
+		}
 	}
 
 	log.Printf("checkout completed for %s, updating entitlement to %s", customerEmail, entitlement)
+	srv.updateUserEntitlementByEmail(context.Background(), customerEmail, entitlement)
+}
+
+func (srv *Server) handleSubscriptionCreated(event stripe.Event) {
+	var subscription stripe.Subscription
+	if err := json.Unmarshal(event.Data.Raw, &subscription); err != nil {
+		log.Printf("error parsing customer.subscription.created: %v", err)
+		return
+	}
+
+	if subscription.Status != stripe.SubscriptionStatusActive && subscription.Status != stripe.SubscriptionStatusTrialing {
+		log.Printf("subscription %s not active/trialing, status: %s", subscription.ID, subscription.Status)
+		return
+	}
+
+	// Get customer email
+	customerEmail := srv.getCustomerEmail(&subscription)
+	if customerEmail == "" {
+		log.Printf("could not determine customer email for subscription %s", subscription.ID)
+		return
+	}
+
+	// Determine entitlement from subscription items
+	entitlement := "free"
+	if subscription.Items != nil && len(subscription.Items.Data) > 0 {
+		priceID := subscription.Items.Data[0].Price.ID
+		entitlement = srv.getEntitlementFromPriceID(priceID)
+	}
+
+	log.Printf("subscription %s created for %s, setting entitlement to %s", subscription.ID, customerEmail, entitlement)
 	srv.updateUserEntitlementByEmail(context.Background(), customerEmail, entitlement)
 }
 
@@ -365,5 +410,37 @@ func (srv *Server) getCustomerEmail(subscription *stripe.Subscription) string {
 		return email
 	}
 
+	// If customer is just an ID string, fetch the full customer object
+	customerID := subscription.Customer.ID
+	if customerID != "" && srv.StripeClient != nil {
+		customer, err := srv.StripeClient.GetCustomer(customerID)
+		if err != nil {
+			log.Printf("failed to fetch customer %s: %v", customerID, err)
+			return ""
+		}
+		return customer.Email
+	}
+
 	return ""
+}
+
+// getEntitlementFromSubscriptionID retrieves entitlement from a subscription ID
+func (srv *Server) getEntitlementFromSubscriptionID(subscriptionID string) string {
+	if srv.StripeClient == nil {
+		return "free"
+	}
+
+	sub, err := srv.StripeClient.GetSubscription(subscriptionID)
+	if err != nil {
+		log.Printf("failed to get subscription %s: %v", subscriptionID, err)
+		return "free"
+	}
+
+	if sub.Items != nil && len(sub.Items.Data) > 0 {
+		priceID := sub.Items.Data[0].Price.ID
+		return srv.getEntitlementFromPriceID(priceID)
+	}
+
+	log.Printf("no items found in subscription %s, defaulting to free", subscriptionID)
+	return "free"
 }

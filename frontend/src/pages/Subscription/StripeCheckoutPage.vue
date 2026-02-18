@@ -160,14 +160,14 @@ async function handleSubmit() {
             class="input"
             placeholder="John Doe"
             required
+            autofocus
           />
         </div>
 
         <div class="formGroup">
           <label class="label">Card Information</label>
-          <div id="card-element" class="cardElement">
-            <div v-if="loading" class="loadingText">Loading payment form...</div>
-          </div>
+          <div v-if="loading" class="loadingText">Loading payment form...</div>
+          <div v-show="!loading" id="card-element" class="cardElement"></div>
         </div>
 
         <p v-if="error" class="errorMessage">{{ error }}</p>
@@ -176,13 +176,15 @@ async function handleSubmit() {
           <button
             type="submit"
             class="button primary"
-            :disabled="loading || processing || !cardholderName.trim()"
+            :disabled="loading || processing"
+            tabindex="0"
           >
             {{ processing ? 'Processing...' : 'Subscribe' }}
           </button>
           <button
             type="button"
             class="button secondary"
+            tabindex="0"
             @click="router.push('/subscription')"
           >
             Cancel
@@ -287,6 +289,7 @@ async function handleSubmit() {
   color: inherit;
   font-size: 16px;
   transition: all 0.2s;
+  box-sizing: border-box;
 
   &:focus {
     outline: none;

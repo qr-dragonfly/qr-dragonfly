@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useUser } from '../../composables/useUser'
-import { createPortalSession, createCheckoutSession } from '../../api/stripe/stripe.api'
+import { createPortalSession } from '../../api/stripe/stripe.api'
 
 const route = useRoute()
-const { user, userType } = useUser()
+const router = useRouter()
+const { user, userType, reload: reloadUser } = useUser()
 
 type PlanTier = {
   name: string
@@ -78,6 +79,8 @@ const portalLoading = ref(false)
 const showConfirmModal = ref(false)
 const pendingPlan = ref<PlanTier | null>(null)
 const actionLoading = ref(false)
+const waitingForWebhook = ref(false)
+const webhookCheckInterval = ref<number | null>(null)
 
 const planAction = computed(() => {
   if (!pendingPlan.value || !currentPlan.value) return null
@@ -94,10 +97,44 @@ onMounted(() => {
   // Check for success query param
   if (route.query.success === 'true') {
     checkoutSuccess.value = true
-    // Clear the query param after 5 seconds
+    waitingForWebhook.value = true
+    
+    // Poll to check if user type has been updated
+    let pollCount = 0
+    const maxPolls = 20 // Poll for up to 20 seconds
+    
+    webhookCheckInterval.value = window.setInterval(async () => {
+      pollCount++
+      
+      // Refresh user data from Cognito
+      await reloadUser()
+      
+      // Stop polling after max attempts or if account is upgraded
+      if (pollCount >= maxPolls || userType.value !== 'free') {
+        waitingForWebhook.value = false
+        if (webhookCheckInterval.value) {
+          clearInterval(webhookCheckInterval.value)
+          webhookCheckInterval.value = null
+        }
+      }
+    }, 1000) // Check every second
+    
+    // Clear the success message after 30 seconds
     setTimeout(() => {
       checkoutSuccess.value = false
+      waitingForWebhook.value = false
+      if (webhookCheckInterval.value) {
+        clearInterval(webhookCheckInterval.value)
+        webhookCheckInterval.value = null
+      }
     }, 5000)
+  }
+})
+
+onUnmounted(() => {
+  // Cleanup interval on component unmount
+  if (webhookCheckInterval.value) {
+    clearInterval(webhookCheckInterval.value)
   }
 })
 
@@ -126,17 +163,32 @@ async function confirmPlanChange() {
   
   try {
     if (planAction.value === 'upgrade') {
-      // For upgrades, redirect to checkout
-      const response = await createCheckoutSession(pendingPlan.value.userType as 'basic' | 'enterprise')
-      window.location.href = response.url
+      // For upgrades, use embedded checkout page (Stripe Elements)
+      router.push({ path: '/checkout', query: { plan: pendingPlan.value.userType } })
+      
+      // Alternative: Use Stripe Checkout (hosted page)
+      // Uncomment below to redirect to Stripe's hosted checkout instead:
+      // const response = await createCheckoutSession(pendingPlan.value.userType as 'basic' | 'enterprise')
+      // window.location.href = response.url
     } else if (planAction.value === 'downgrade') {
       // For downgrades (including to free), use the portal
       const response = await createPortalSession()
       window.location.href = response.url
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error('Plan change error:', err)
-    checkoutError.value = `Failed to ${planAction.value}. Please try again.`
+    
+    // Check for specific error messages
+    const errorMessage = err?.payload?.error || err?.message || 'Unknown error'
+    
+    if (errorMessage.includes('already has an active subscription')) {
+      checkoutError.value = 'You already have an active subscription for this plan. Please manage your billing to make changes.'
+    } else if (err?.status === 401) {
+      checkoutError.value = 'Please log in again to continue.'
+    } else {
+      checkoutError.value = `Failed to ${planAction.value}. Please try again.`
+    }
+    
     actionLoading.value = false
     closeModal()
   }
@@ -195,7 +247,14 @@ function getPlanButtonText(plan: PlanTier): string {
     </section>
 
     <div v-if="checkoutSuccess" class="card success">
-      ✓ Subscription successful! Your account has been upgraded. This may take a few moments to reflect.
+      <div class="successContent">
+        <span>✓ Subscription successful!</span>
+        <div v-if="waitingForWebhook" class="spinnerContainer">
+          <div class="spinner"></div>
+          <span class="spinnerText">Updating your account...</span>
+        </div>
+        <span v-else>Your account has been upgraded. This may take a few moments to reflect.</span>
+      </div>
     </div>
 
     <div v-if="checkoutError" class="card error">{{ checkoutError }}</div>

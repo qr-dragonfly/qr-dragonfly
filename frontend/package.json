@@ -5,8 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:staging": "vite --mode staging",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "build:staging": "vue-tsc -b && vite build --mode staging",
+    "preview": "vite preview",
+    "preview:staging": "vite preview --mode staging",
+    "heroku-postbuild": "npm run build"
   },
   "dependencies": {
     "qrcode": "^1.5.4",

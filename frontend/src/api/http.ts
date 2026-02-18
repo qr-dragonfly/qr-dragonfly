@@ -54,7 +54,7 @@ export async function requestJson<T>(options: RequestJsonOptions): Promise<T> {
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
     signal: options.signal,
-    credentials: options.credentials,
+    credentials: options.credentials ?? 'include', // Always include credentials (cookies) by default
   })
 
   const contentType = response.headers.get('content-type') || ''

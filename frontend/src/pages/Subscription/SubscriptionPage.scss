@@ -110,6 +110,39 @@
   font-weight: 500;
 }
 
+.successContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.spinnerContainer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(134, 239, 172, 0.3);
+  border-top-color: #86efac;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinnerText {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
 .plansGrid {
   display: grid;
   gap: 24px;

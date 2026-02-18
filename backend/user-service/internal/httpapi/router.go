@@ -86,6 +86,8 @@ type Server struct {
 		CreateCustomerPortalSession(customerEmail string) (*stripe.BillingPortalSession, error)
 		ConstructEvent(payload []byte, signature string) (stripe.Event, error)
 		GetPriceIDForPlan(plan string) (string, error)
+		GetSubscription(subscriptionID string) (*stripe.Subscription, error)
+		GetCustomer(customerID string) (*stripe.Customer, error)
 	}
 }
 

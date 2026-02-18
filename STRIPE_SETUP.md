@@ -6,8 +6,8 @@ This document explains how to configure Stripe for subscription payments in the 
 
 The application uses Stripe Checkout for subscription payments with two tiers:
 
-- **Basic**: $19/month - 50 active QR codes, 200 total
-- **Enterprise**: $99/month - 2,000 active QR codes, 10,000 total
+- **Basic**: $6/month - 50 active QR codes, 200 total
+- **Enterprise**: $65/month - 2,000 active QR codes, 10,000 total
 
 When a user subscribes, their account is automatically upgraded via Stripe webhooks.
 
@@ -34,19 +34,21 @@ STRIPE_CANCEL_URL=http://localhost:5173/subscription
 ### Setup Steps
 
 1. **Create Stripe Account**
-
    - Go to https://stripe.com and create an account
    - Get your API keys from Dashboard → Developers → API keys
 
 2. **Create Products and Prices**
-
-   - Go to Dashboard → Products → Add product
-   - Create "Basic" product with $19/month recurring price
-   - Create "Enterprise" product with $99/month recurring price
-   - Copy the price IDs (they start with `price_`)
+   - Go to Dashboard → Products → Add product (https://dashboard.stripe.com/test/products)
+   - Create "Basic" product:
+     - Name: "Basic Plan"
+     - Pricing: $6.00 USD / month (recurring)
+     - Copy the Price ID (starts with `price_`)
+   - Create "Enterprise" product:
+     - Name: "Enterprise Plan"
+     - Pricing: $65.00 USD / month (recurring)
+     - Copy the Price ID (starts with `price_`)
 
 3. **Configure Webhooks**
-
    - Go to Dashboard → Developers → Webhooks
    - Add endpoint: `https://your-domain.com/api/stripe/webhook`
    - Select events to listen to:
@@ -78,7 +80,6 @@ The frontend automatically connects to the backend Stripe endpoints. No addition
 
 1. Use Stripe test API keys during development
 2. Use test card numbers from https://stripe.com/docs/testing
-
    - Success: `4242 4242 4242 4242`
    - 3D Secure: `4000 0025 0000 3155`
    - Declined: `4000 0000 0000 0002`

@@ -47,6 +47,7 @@ func main() {
 	// 1. CORS (outermost)
 	handler = httpapi.NewCorsMiddleware(httpapi.CorsOptions{
 		AllowedOrigins:   allowedOrigins,
+		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-User-Type"},
 		AllowCredentials: true,
 	})(handler)
 
