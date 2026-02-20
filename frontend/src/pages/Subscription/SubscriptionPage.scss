@@ -29,6 +29,27 @@
   backdrop-filter: blur(10px);
 }
 
+.authNotice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(100, 108, 255, 0.08);
+  border-color: rgba(100, 108, 255, 0.25);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+}
+
+.authNoticeLink {
+  color: $color-link;
+  text-decoration: none;
+  font-weight: 500;
+  white-space: nowrap;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .sectionTitle {
   margin: 0 0 16px;
   font-size: 20px;

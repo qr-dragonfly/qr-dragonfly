@@ -32,7 +32,7 @@ func NewClient(cfg Config) *Client {
 }
 
 // CreateCheckoutSession creates a Stripe Checkout session for a subscription
-func (c *Client) CreateCheckoutSession(customerEmail string, priceID string) (*stripe.CheckoutSession, error) {
+func (c *Client) CreateCheckoutSession(customerEmail string, priceID string, plan string) (*stripe.CheckoutSession, error) {
 	// Check if customer already has an active subscription for this price
 	customerID, err := c.findCustomerByEmail(customerEmail)
 	if err == nil && customerID != "" {
@@ -56,11 +56,13 @@ func (c *Client) CreateCheckoutSession(customerEmail string, priceID string) (*s
 		},
 		SuccessURL: stripe.String(c.cfg.SuccessURL),
 		CancelURL:  stripe.String(c.cfg.CancelURL),
+		Metadata:   map[string]string{"plan": plan},
 	}
 	// Store customer email in subscription metadata as a fallback
 	params.SubscriptionData = &stripe.CheckoutSessionSubscriptionDataParams{
 		Metadata: map[string]string{
 			"customer_email": customerEmail,
+			"plan":           plan,
 		},
 	}
 
@@ -177,9 +179,9 @@ func (c *Client) CreateSubscriptionWithPaymentMethod(customerEmail, paymentMetho
 		return nil, fmt.Errorf("failed to check existing subscriptions: %w", err)
 	}
 	if existingSub != nil {
-		// Found an existing active subscription - this is a duplicate attempt
-		fmt.Printf("[Stripe] Found existing active subscription %s for price %s\n", existingSub.ID, priceID)
-		return nil, fmt.Errorf("customer already has an active %s subscription (ID: %s)", existingSub.Items.Data[0].Price.ID, existingSub.ID)
+		// Found an existing active subscription - return it instead of creating duplicate
+		fmt.Printf("[Stripe] Found existing active subscription %s for price %s, returning it\n", existingSub.ID, priceID)
+		return existingSub, nil
 	}
 	fmt.Printf("[Stripe] No existing subscription found, proceeding to create new one\n")
 

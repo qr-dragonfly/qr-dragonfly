@@ -68,7 +68,7 @@ func (srv *Server) handleCreateCheckoutSession(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	checkoutSession, err := srv.StripeClient.CreateCheckoutSession(user.Email, priceID)
+	checkoutSession, err := srv.StripeClient.CreateCheckoutSession(user.Email, priceID, req.Plan)
 	if err != nil {
 		log.Printf("stripe checkout error: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "checkout_failed"})
@@ -136,13 +136,22 @@ func (srv *Server) handleCreateSubscription(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	log.Printf("subscription created successfully: %s, status: %s", sub.ID, sub.Status)
+	log.Printf("subscription created/found successfully: %s, status: %s", sub.ID, sub.Status)
 
-	// Subscription created successfully
-	// The webhook will handle updating user entitlements
+	// Update user entitlements immediately
+	// This ensures the user is upgraded even if they already had an active subscription
+	entitlement := "free"
+	if sub.Items != nil && len(sub.Items.Data) > 0 {
+		entitlement = srv.getEntitlementFromPriceID(sub.Items.Data[0].Price.ID)
+	}
+	log.Printf("updating user %s entitlement to %s", user.Email, entitlement)
+	srv.updateUserEntitlementByEmail(ctx, user.Email, entitlement)
+
+	// Subscription created/found successfully
 	writeJSON(w, http.StatusOK, map[string]any{
 		"subscriptionId": sub.ID,
 		"status":         string(sub.Status),
+		"entitlement":    entitlement,
 	})
 }
 
@@ -294,8 +303,8 @@ func (srv *Server) handleSubscriptionUpdated(event stripe.Event) {
 		return
 	}
 
-	if subscription.Status != stripe.SubscriptionStatusActive {
-		log.Printf("subscription %s not active, status: %s", subscription.ID, subscription.Status)
+	if subscription.Status != stripe.SubscriptionStatusActive && subscription.Status != stripe.SubscriptionStatusTrialing {
+		log.Printf("subscription %s not active/trialing, status: %s", subscription.ID, subscription.Status)
 		// If canceled or past_due, downgrade to free
 		if subscription.Status == stripe.SubscriptionStatusCanceled ||
 			subscription.Status == stripe.SubscriptionStatusIncomplete ||

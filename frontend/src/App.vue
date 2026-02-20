@@ -50,11 +50,11 @@ const isAuthRoute = computed(() => {
 
         <RouterLink v-if="!isAuthed" class="navLink" to="/register">Create account</RouterLink>
         <RouterLink v-if="!isAuthed" class="navLink" to="/login">Login</RouterLink>
+        <RouterLink class="navLink" to="/subscription">Subscription</RouterLink>
 
         <template v-if="isAuthed">
           <span class="navUser" aria-label="Signed in user">{{ user?.email }}</span>
           <RouterLink v-if="isAdmin" class="navLink" to="/admin">Admin</RouterLink>
-          <RouterLink class="navLink" to="/subscription">Subscription</RouterLink>
           <RouterLink class="navLink" to="/account">Account</RouterLink>
           <button class="navLink navButton" type="button" :disabled="busyLogout" @click="logout">
             {{ busyLogout ? 'Logging out…' : 'Logout' }}

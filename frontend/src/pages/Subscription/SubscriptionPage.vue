@@ -6,7 +6,7 @@ import { createPortalSession } from '../../api/stripe/stripe.api'
 
 const route = useRoute()
 const router = useRouter()
-const { user, userType, reload: reloadUser } = useUser()
+const { user, isAuthed, isLoaded, userType, reload: reloadUser } = useUser()
 
 type PlanTier = {
   name: string
@@ -139,6 +139,11 @@ onUnmounted(() => {
 })
 
 function handlePlanClick(plan: PlanTier) {
+  if (!isAuthed.value) {
+    router.push({ name: 'login', query: { redirect: '/subscription' } })
+    return
+  }
+
   // Don't do anything for current plan
   if (plan.userType === userType.value) {
     return
@@ -229,6 +234,11 @@ function getPlanButtonText(plan: PlanTier): string {
       <p class="subtitle">Choose the plan that fits your needs.</p>
     </header>
 
+    <div v-if="isLoaded && !isAuthed" class="card authNotice">
+      <span>Sign in to subscribe or manage your plan.</span>
+      <router-link :to="{ name: 'login', query: { redirect: '/subscription' } }" class="authNoticeLink">Sign in</router-link>
+    </div>
+
     <section v-if="user && currentPlan" class="card currentPlan">
       <h2 class="sectionTitle">Your current plan</h2>
       <div class="planBadge">
@@ -274,14 +284,24 @@ function getPlanButtonText(plan: PlanTier): string {
         </ul>
 
         <div class="planActions">
-          <button v-if="plan.userType === userType" class="button current" disabled>Current Plan</button>
-          <button 
-            v-else 
-            class="button" 
+          <template v-if="isAuthed">
+            <button v-if="plan.userType === userType" class="button current" disabled>Current Plan</button>
+            <button
+              v-else
+              class="button"
+              :class="{ primary: plan.highlight, secondary: plan.userType === 'free' }"
+              @click="handlePlanClick(plan)"
+            >
+              {{ getPlanButtonText(plan) }}
+            </button>
+          </template>
+          <button
+            v-else
+            class="button"
             :class="{ primary: plan.highlight, secondary: plan.userType === 'free' }"
             @click="handlePlanClick(plan)"
           >
-            {{ getPlanButtonText(plan) }}
+            Get Started
           </button>
         </div>
       </div>

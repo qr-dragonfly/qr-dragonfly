@@ -5,6 +5,8 @@ import type { QrCodeItem } from '../../types/qrCodeItem'
 import { generateQrDataUrl } from '../../lib/qr'
 import { trackingUrlForQrId } from '../../lib/tracking'
 
+const CLICK_API_BASE_URL = (import.meta as { env?: Record<string, string> }).env?.VITE_CLICK_API_BASE_URL || ''
+
 type DailyClicks = {
   qrCodeId: string
   dayIso: string
@@ -266,6 +268,7 @@ async function fetchDailyClicksBatch(qrId: string, dayIsos: string[]): Promise<R
       method: 'GET',
       path: '/api/clicks/daily-batch',
       query: { qrId, days: dayIsos.join(',') },
+      baseUrl: CLICK_API_BASE_URL,
     })
   } catch {
     return {}

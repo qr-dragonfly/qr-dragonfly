@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { qrCodesApi, requestJson } from '../../api'
+import { qrCodesApi, requestJson, CLICK_API_BASE_URL } from '../../api'
 import { useUser } from '../../composables/useUser'
 import { trackingUrlForQrId } from '../../lib/tracking'
 
@@ -47,6 +47,7 @@ async function fetchDailyClicksBatch(qrId: string, dayIsos: string[]): Promise<R
       method: 'GET',
       path: '/api/clicks/daily-batch',
       query: { qrId, days: dayIsos.join(',') },
+      baseUrl: CLICK_API_BASE_URL,
     })
   } catch {
     return {}

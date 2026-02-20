@@ -6,7 +6,7 @@ import { createSubscription } from '../../api/stripe/stripe.api'
 
 const router = useRouter()
 const route = useRoute()
-useUser()
+const { reload } = useUser()
 
 // Stripe publishable key
 const STRIPE_PK = 'pk_test_51Sxy89Lj4DF9Rxipkx5cl936ms3Yc8KNzf6t3h7TtUecFRwAK5f0G1AfrFpt0v4yazK3IV3SdQG43noPaDw8JyKb00kpWH4e1B'
@@ -118,6 +118,9 @@ async function handleSubmit() {
 
     // Create subscription with payment method
     await createSubscription(selectedPlan.value as 'basic' | 'enterprise', paymentMethod.id)
+    
+    // Reload user to get updated entitlements from Cognito
+    await reload()
     
     // Success!
     success.value = true

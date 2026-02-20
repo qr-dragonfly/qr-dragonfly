@@ -17,6 +17,7 @@ export interface CreateSubscriptionRequest {
 export interface CreateSubscriptionResponse {
   subscriptionId: string;
   status: string;
+  entitlement?: string;
 }
 
 export interface CreatePortalSessionResponse {

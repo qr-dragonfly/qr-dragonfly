@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { ensureUserLoaded } from '../composables/useUser'
 
 import HomePage from '../pages/HomePage/HomePage.vue'
 import RegisterPage from '../pages/Auth/RegisterPage.vue'
@@ -41,7 +42,7 @@ export const router = createRouter({
     { path: '/code-of-conduct', name: 'code-of-conduct', component: CodeOfConductPage },
 
     { path: '/subscription', name: 'subscription', component: SubscriptionPage },
-    { path: '/checkout', name: 'checkout', component: StripeCheckoutPage },
+    { path: '/checkout', name: 'checkout', component: StripeCheckoutPage, meta: { requiresAuth: true } },
     { path: '/qr-codes/:id/stats', name: 'qr-code-stats', component: QrCodeStatsPage },
     
     { path: '/admin', name: 'admin', component: AdminPage },
@@ -49,4 +50,13 @@ export const router = createRouter({
 
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
+})
+
+router.beforeEach(async (to) => {
+  if (!to.meta.requiresAuth) return true
+  const user = await ensureUserLoaded()
+  if (!user) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+  return true
 })

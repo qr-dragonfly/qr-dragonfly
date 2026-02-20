@@ -27,6 +27,16 @@ async function reloadCurrentUser(): Promise<void> {
   await loadCurrentUserOnce()
 }
 
+/**
+ * Ensures user state has been fetched at least once.
+ * Safe to call outside of component context (e.g. router guards).
+ * Returns the current user or null if unauthenticated.
+ */
+export async function ensureUserLoaded(): Promise<typeof currentUser.value> {
+  await loadCurrentUserOnce()
+  return currentUser.value
+}
+
 export function useUser() {
   onMounted(() => {
     void loadCurrentUserOnce()

@@ -81,7 +81,7 @@ type Server struct {
 
 	// Stripe integration (optional)
 	StripeClient interface {
-		CreateCheckoutSession(customerEmail string, priceID string) (*stripe.CheckoutSession, error)
+		CreateCheckoutSession(customerEmail string, priceID string, plan string) (*stripe.CheckoutSession, error)
 		CreateSubscriptionWithPaymentMethod(customerEmail, paymentMethodID, priceID string) (*stripe.Subscription, error)
 		CreateCustomerPortalSession(customerEmail string) (*stripe.BillingPortalSession, error)
 		ConstructEvent(payload []byte, signature string) (stripe.Event, error)
