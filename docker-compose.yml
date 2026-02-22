@@ -73,8 +73,6 @@ services:
       CORS_ALLOW_ORIGINS: "http://localhost:5173"
       COOKIE_SECURE: "false"
       COOKIE_SAMESITE: "Lax"
-    volumes:
-      - ~/.aws:/root/.aws:ro
     ports:
       - "8081:8081"
 

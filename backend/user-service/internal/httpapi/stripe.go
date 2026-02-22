@@ -13,6 +13,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
 	cognitoTypes "github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
 	"github.com/stripe/stripe-go/v81"
+
+	"user-service/internal/model"
 )
 
 type createCheckoutSessionRequest struct {
@@ -218,6 +220,8 @@ func (srv *Server) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		srv.handleSubscriptionUpdated(event)
 	case "customer.subscription.deleted":
 		srv.handleSubscriptionDeleted(event)
+	case "invoice.payment_failed":
+		srv.handleInvoicePaymentFailed(event)
 	default:
 		log.Printf("unhandled webhook event type: %s", event.Type)
 	}
@@ -305,12 +309,15 @@ func (srv *Server) handleSubscriptionUpdated(event stripe.Event) {
 
 	if subscription.Status != stripe.SubscriptionStatusActive && subscription.Status != stripe.SubscriptionStatusTrialing {
 		log.Printf("subscription %s not active/trialing, status: %s", subscription.ID, subscription.Status)
-		// If canceled or past_due, downgrade to free
-		if subscription.Status == stripe.SubscriptionStatusCanceled ||
-			subscription.Status == stripe.SubscriptionStatusIncomplete ||
-			subscription.Status == stripe.SubscriptionStatusIncompleteExpired {
+		// Downgrade immediately on terminal or payment-failure statuses
+		switch subscription.Status {
+		case stripe.SubscriptionStatusCanceled,
+			stripe.SubscriptionStatusIncomplete,
+			stripe.SubscriptionStatusIncompleteExpired,
+			stripe.SubscriptionStatusPastDue,
+			stripe.SubscriptionStatusUnpaid:
 			if customerEmail := srv.getCustomerEmail(&subscription); customerEmail != "" {
-				log.Printf("subscription %s inactive, downgrading customer to free", subscription.ID)
+				log.Printf("subscription %s status=%s, downgrading %s to free", subscription.ID, subscription.Status, customerEmail)
 				srv.updateUserEntitlementByEmail(context.Background(), customerEmail, "free")
 			}
 		}
@@ -353,6 +360,45 @@ func (srv *Server) handleSubscriptionDeleted(event stripe.Event) {
 	srv.updateUserEntitlementByEmail(context.Background(), customerEmail, "free")
 }
 
+// handleInvoicePaymentFailed fires when a recurring payment attempt fails.
+// Stripe will retry automatically; we downgrade immediately so access reflects
+// the real billing state. If the customer pays before the subscription is
+// canceled, the subsequent customer.subscription.updated (active) will restore access.
+func (srv *Server) handleInvoicePaymentFailed(event stripe.Event) {
+	var invoice stripe.Invoice
+	if err := json.Unmarshal(event.Data.Raw, &invoice); err != nil {
+		log.Printf("error parsing invoice.payment_failed: %v", err)
+		return
+	}
+
+	// Only act on subscription invoices (not one-off)
+	if invoice.Subscription == nil || invoice.Subscription.ID == "" {
+		return
+	}
+
+	// Skip the very first invoice attempt — new subscriptions may have a brief
+	// payment-method setup delay and will be retried within seconds.
+	if invoice.AttemptCount <= 1 {
+		log.Printf("invoice %s first attempt failed, waiting for retry before downgrading", invoice.ID)
+		return
+	}
+
+	customerEmail := ""
+	if invoice.CustomerEmail != "" {
+		customerEmail = invoice.CustomerEmail
+	} else if invoice.Customer != nil {
+		customerEmail = invoice.Customer.Email
+	}
+	if customerEmail == "" {
+		log.Printf("invoice.payment_failed: no email on invoice %s", invoice.ID)
+		return
+	}
+
+	log.Printf("invoice %s payment failed (attempt %d) for %s, downgrading to free",
+		invoice.ID, invoice.AttemptCount, customerEmail)
+	srv.updateUserEntitlementByEmail(context.Background(), customerEmail, "free")
+}
+
 func (srv *Server) updateUserEntitlementByEmail(ctx context.Context, email, entitlement string) {
 	// List users to find by email
 	listOut, err := srv.Cognito.ListUsers(ctx, &cognitoidentityprovider.ListUsersInput{
@@ -367,13 +413,23 @@ func (srv *Server) updateUserEntitlementByEmail(ctx context.Context, email, enti
 
 	username := aws.ToString(listOut.Users[0].Username)
 
-	// Update both user_type (for backward compatibility) and entitlements
+	// Read existing entitlements so we can preserve non-plan entries (e.g. "admin")
+	var existingEntitlements string
+	for _, attr := range listOut.Users[0].Attributes {
+		if aws.ToString(attr.Name) == cognitoEntitlementsAttr {
+			existingEntitlements = aws.ToString(attr.Value)
+			break
+		}
+	}
+	merged := mergeEntitlement(existingEntitlements, entitlement)
+
+	// Update both user_type (single value) and entitlements (pipe-separated)
 	_, err = srv.Cognito.AdminUpdateUserAttributes(ctx, &cognitoidentityprovider.AdminUpdateUserAttributesInput{
 		UserPoolId: aws.String(srv.UserPoolID),
 		Username:   aws.String(username),
 		UserAttributes: []cognitoTypes.AttributeType{
 			{Name: aws.String(cognitoUserTypeAttr), Value: aws.String(entitlement)},
-			{Name: aws.String(cognitoEntitlementsAttr), Value: aws.String(entitlement)},
+			{Name: aws.String(cognitoEntitlementsAttr), Value: aws.String(merged)},
 		},
 	})
 	if err != nil {
@@ -381,7 +437,27 @@ func (srv *Server) updateUserEntitlementByEmail(ctx context.Context, email, enti
 		return
 	}
 
-	log.Printf("updated user %s to entitlement %s", email, entitlement)
+	log.Printf("updated user %s entitlements: %q → %q", email, existingEntitlements, merged)
+}
+
+// planTiers are the mutually-exclusive subscription tiers. Only one should appear
+// in the entitlements string at a time; the others are replaced when upgrading/downgrading.
+var planTiers = map[string]bool{"free": true, "basic": true, "enterprise": true}
+
+// mergeEntitlement replaces the plan tier in an existing pipe-separated entitlements
+// string while preserving all other entries (e.g. "admin").
+func mergeEntitlement(existing, newPlan string) string {
+	parts := strings.Split(existing, "|")
+	out := make([]string, 0, len(parts)+1)
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" || planTiers[p] {
+			continue // drop old plan tier
+		}
+		out = append(out, p)
+	}
+	out = append(out, newPlan)
+	return strings.Join(out, "|")
 }
 
 // getEntitlementFromPriceID maps Stripe price ID to entitlement tier
@@ -452,4 +528,41 @@ func (srv *Server) getEntitlementFromSubscriptionID(subscriptionID string) strin
 
 	log.Printf("no items found in subscription %s, defaulting to free", subscriptionID)
 	return "free"
+}
+
+// syncStripeEntitlement checks the user's active Stripe subscription and updates Cognito
+// if the stored plan tier doesn't match. Works in both directions (upgrade and downgrade).
+// It mutates user.Entitlements/UserType in-place so the login response already reflects
+// the corrected tier.
+func (srv *Server) syncStripeEntitlement(ctx context.Context, user *model.User) {
+	stripeEntitlement, err := srv.StripeClient.GetEntitlementForEmail(user.Email)
+	if err != nil {
+		log.Printf("stripe entitlement lookup failed for %s: %v", user.Email, err)
+		return
+	}
+
+	// Extract the current plan tier from the pipe-separated entitlements string
+	// (e.g. "admin|enterprise" → "enterprise")
+	currentPlan := "free"
+	for _, part := range strings.Split(user.Entitlements, "|") {
+		part = strings.ToLower(strings.TrimSpace(part))
+		if planTiers[part] {
+			currentPlan = part
+			break
+		}
+	}
+	if currentPlan == "free" && user.UserType != "" {
+		if t := strings.ToLower(strings.TrimSpace(user.UserType)); planTiers[t] {
+			currentPlan = t
+		}
+	}
+
+	if stripeEntitlement == currentPlan {
+		return // already in sync
+	}
+
+	log.Printf("login sync: updating %s cognito=%s → stripe=%s", user.Email, currentPlan, stripeEntitlement)
+	srv.updateUserEntitlementByEmail(ctx, user.Email, stripeEntitlement)
+	user.Entitlements = mergeEntitlement(user.Entitlements, stripeEntitlement)
+	user.UserType = stripeEntitlement
 }

@@ -6,9 +6,15 @@ import { useUser } from './composables/useUser'
 
 const route = useRoute()
 const router = useRouter()
-const { user, isAdmin, reload } = useUser()
+const { user, isAdmin, userType, reload } = useUser()
 
 const isAuthed = computed(() => Boolean(user.value?.email))
+const planBadge = computed(() => {
+  if (!isAuthed.value) return null
+  if (userType.value === 'enterprise') return 'Enterprise'
+  if (userType.value === 'basic') return 'Basic'
+  return null
+})
 const year = new Date().getFullYear()
 const busyLogout = ref(false)
 
@@ -44,16 +50,18 @@ const isAuthRoute = computed(() => {
         <RouterLink class="navLink brand" to="/">
           <img src="/dragonfly-tmp.png" alt="QR-Dragonfly" class="logo" />
           <span>QR-Dragonfly</span>
+          <span v-if="planBadge" class="planBadge" :class="planBadge.toLowerCase()">{{ planBadge }}</span>
         </RouterLink>
 
         <div class="spacer" />
 
         <RouterLink v-if="!isAuthed" class="navLink" to="/register">Create account</RouterLink>
         <RouterLink v-if="!isAuthed" class="navLink" to="/login">Login</RouterLink>
-        <RouterLink class="navLink" to="/subscription">Subscription</RouterLink>
+        <RouterLink v-if="!isAuthed" class="navLink" to="/subscription">Subscription</RouterLink>
 
         <template v-if="isAuthed">
           <span class="navUser" aria-label="Signed in user">{{ user?.email }}</span>
+          <RouterLink class="navLink" to="/subscription">Subscription</RouterLink>
           <RouterLink v-if="isAdmin" class="navLink" to="/admin">Admin</RouterLink>
           <RouterLink class="navLink" to="/account">Account</RouterLink>
           <button class="navLink navButton" type="button" :disabled="busyLogout" @click="logout">
@@ -174,6 +182,28 @@ const isAuthRoute = computed(() => {
 
 .brand {
   font-weight: 700;
+}
+
+.planBadge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1.4;
+
+  &.basic {
+    background: rgba(100, 108, 255, 0.15);
+    color: $color-link;
+    border: 1px solid rgba(100, 108, 255, 0.3);
+  }
+
+  &.enterprise {
+    background: rgba(234, 179, 8, 0.12);
+    color: #d4a400;
+    border: 1px solid rgba(234, 179, 8, 0.3);
+  }
 }
 
 .footer {

@@ -209,6 +209,12 @@ async function handleSubmit() {
 <style scoped lang="scss">
 @use '../../styles/variables' as *;
 
+.header {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
 .paymentForm {
   max-width: 600px;
   margin: 24px auto;
@@ -306,6 +312,8 @@ async function handleSubmit() {
 }
 
 .cardElement {
+  width: 100%;
+  box-sizing: border-box;
   padding: 12px 16px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-color);

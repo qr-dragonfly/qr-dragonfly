@@ -1,4 +1,9 @@
 .DS_Store
 
+# Environment files (contain secrets - never commit)
+.env
+.env.*
+!.env.example
+
 # Go
 /bin/

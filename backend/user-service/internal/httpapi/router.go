@@ -88,6 +88,7 @@ type Server struct {
 		GetPriceIDForPlan(plan string) (string, error)
 		GetSubscription(subscriptionID string) (*stripe.Subscription, error)
 		GetCustomer(customerID string) (*stripe.Customer, error)
+		GetEntitlementForEmail(email string) (string, error)
 	}
 }
 
@@ -401,6 +402,12 @@ func (srv Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		// still return token, but without user details
 		writeJSON(w, http.StatusOK, AuthSession{User: model.User{ID: req.Email, Email: req.Email}.NormalizeForResponse(), Token: idToken})
 		return
+	}
+
+	// Sync Stripe entitlement on every login so Cognito stays up-to-date
+	// even if a webhook was missed or credentials were temporarily unavailable.
+	if srv.StripeClient != nil {
+		srv.syncStripeEntitlement(ctx, &user)
 	}
 
 	writeJSON(w, http.StatusOK, AuthSession{User: user.NormalizeForResponse(), Token: idToken})
